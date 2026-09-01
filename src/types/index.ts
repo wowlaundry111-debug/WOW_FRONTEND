@@ -96,7 +96,8 @@ export interface OrderItem {
   name: string;
   quantity: number;
   unit: 'KG' | 'ITEM';
-  price: number; // resolved unit price at order time
+  price: number; // resolved unit price at order time; 0 for KG items until weighed
+  kgWeight?: number; // weighed by delivery agent
 }
 
 export interface CartItem {
@@ -124,9 +125,11 @@ export interface Order {
   }[];
   status: OrderStatus;
   totalAmount: number;
+  kgPriceUpdated?: boolean; // true once delivery agent has weighed & finalized KG item prices
   taxAmount?: number;
   deliveryFee?: number;
   discountAmount?: number;
+
   paymentStatus?: PaymentStatus;
   paymentMode?: PaymentMode;
   pickupAddress?: string;

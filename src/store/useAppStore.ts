@@ -80,7 +80,9 @@ interface AppState {
 
   // Actions - Delivery Boy Operations
   verifyOrderItems: (orderId: string, itemsCount: Record<string, number>) => Promise<void>;
+  updateKgWeight: (orderId: string, items: { itemId: string; kgWeight: number }[]) => Promise<{ success: boolean; message?: string }>;
   recordPayment: (orderId: string, paymentMode: PaymentMode) => Promise<void>;
+
 
   // Actions - Super Admin Operations
   createShop: (name: string, branches: string[], upiId: string, bankName: string, accountNo: string, adminEmail: string) => Promise<void>;
@@ -456,8 +458,11 @@ export const useAppStore = create<AppState>()(
       addToCart: (item, quantity) => {
         const { cart } = get();
         const existingIndex = cart.findIndex(c => c.itemId === item._id);
-        const resolvedPrice = item.pricePerKg ?? item.pricePerItem ?? 0;
-        const resolvedUnit = item.pricePerKg ? 'KG' : 'ITEM';
+        const isKg = Boolean(item.pricePerKg && item.pricePerKg > 0) || 
+          item.unit === 'KG' || 
+          (typeof item.name === 'string' && (item.name.toLowerCase().includes('per kg') || item.name.toLowerCase().includes('/ kg')));
+        const resolvedPrice = isKg ? 0 : (item.pricePerItem ?? item.price ?? 0);
+        const resolvedUnit = isKg ? 'KG' : 'ITEM';
 
         if (existingIndex >= 0) {
           const newCart = [...cart];
@@ -485,7 +490,11 @@ export const useAppStore = create<AppState>()(
         set({ cart: get().cart.filter(c => c.itemId !== itemId) });
         const { activeCoupon } = get();
         if (activeCoupon) {
-          const subtotal = get().cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+          const isKgItemCheck = (c: any) => 
+            c.unit === 'KG' || 
+            (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg'))) || 
+            Boolean(c.pricePerKg && c.pricePerKg > 0);
+          const subtotal = get().cart.filter(c => !isKgItemCheck(c)).reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
           if (subtotal < activeCoupon.minOrderValue) {
             set({ activeCoupon: null });
           }
@@ -507,7 +516,11 @@ export const useAppStore = create<AppState>()(
         const coupon = offers.find(o => o.code.toUpperCase() === code.toUpperCase() && o.shopId === currentTenantId);
         if (!coupon) return { success: false, message: 'Invalid coupon code for this shop' };
 
-        const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+        const isKgItemCheck = (c: any) => 
+          c.unit === 'KG' || 
+          (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg'))) || 
+          Boolean(c.pricePerKg && c.pricePerKg > 0);
+        const subtotal = cart.filter(c => !isKgItemCheck(c)).reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
         if (subtotal < coupon.minOrderValue) {
           return { success: false, message: `Minimum order value for this coupon is ₹${coupon.minOrderValue}` };
         }
@@ -525,27 +538,38 @@ export const useAppStore = create<AppState>()(
 
         set({ isLoading: true, error: null });
 
-        const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+        const isKgItemCheck = (c: any) => 
+          c.unit === 'KG' || 
+          (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg'))) || 
+          Boolean(c.pricePerKg && c.pricePerKg > 0);
+
+        const perItemSubtotal = cart
+          .filter(c => !isKgItemCheck(c))
+          .reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
+
         let discount = 0;
         if (activeCoupon) {
-          discount = Math.min((subtotal * activeCoupon.discountPercent) / 100, activeCoupon.maxDiscount);
+          discount = Math.min((perItemSubtotal * activeCoupon.discountPercent) / 100, activeCoupon.maxDiscount);
         }
 
-        const orderItems: OrderItem[] = cart.map(c => ({
-          itemId: c.itemId,
-          name: c.name,
-          quantity: c.quantity,
-          unit: c.unit,
-          price: c.price,
-        }));
+        const orderItems: OrderItem[] = cart.map(c => {
+          const isKg = isKgItemCheck(c);
+          return {
+            itemId: c.itemId,
+            name: c.name,
+            quantity: c.quantity,
+            unit: isKg ? 'KG' : 'ITEM',
+            price: isKg ? 0 : (c.price || 0),
+          };
+        });
 
         try {
           const shop = get().shops.find(s => s._id === currentTenantId);
           const taxPercent = shop?.taxPercent || 0;
           const deliveryFeeAmt = shop?.deliveryFee || 0;
-          const tax = (subtotal * taxPercent) / 100;
+          const tax = (perItemSubtotal * taxPercent) / 100;
           const washPrefsCost = washPreferences?.reduce((s, w) => s + w.price, 0) || 0;
-          const finalTotal = subtotal - discount + tax + deliveryFeeAmt + washPrefsCost;
+          const finalTotal = perItemSubtotal - discount + tax + deliveryFeeAmt + washPrefsCost;
 
           const res = await api.post('/orders', {
             shopId: currentTenantId,
@@ -562,7 +586,7 @@ export const useAppStore = create<AppState>()(
           const newOrder = res.data;
 
           set(state => ({
-            orders: [newOrder, ...state.orders.filter(o => o._id !== newOrder._id)],
+            orders: [newOrder, ...state.orders],
             cart: [],
             activeCoupon: null,
             deliveryInstructions: '',
@@ -572,7 +596,7 @@ export const useAppStore = create<AppState>()(
           return { success: true, orderId: newOrder._id, message: 'Order placed successfully!' };
         } catch (err: any) {
           set({ isLoading: false, error: err.message || 'Failed to place order' });
-          return { success: false, orderId: '', message: 'Failed to place order' };
+          return { success: false, orderId: '', message: err.message || 'Failed to place order' };
         }
       },
 
@@ -630,8 +654,8 @@ export const useAppStore = create<AppState>()(
         const shopId = overrideShopId || get().currentTenantId;
         try {
           let finalImage = image ? await uploadImageToCloudinary(image) : undefined;
-          const res = await api.post('/catalog/categories', { shopId, name, image: finalImage });
-          set(state => ({ categories: [...state.categories, res.data] }));
+          await api.post('/catalog/categories', { shopId, name, image: finalImage });
+          // Note: Socket event 'category_created' will update the store
         } catch (err) {
           console.error('Failed to add category', err);
         }
@@ -679,7 +703,7 @@ export const useAppStore = create<AppState>()(
         const shopId = cat ? cat.shopId : currentTenantId;
         try {
           let finalImage = image ? await uploadImageToCloudinary(image) : undefined;
-          const res = await api.post('/catalog/items', {
+          await api.post('/catalog/items', {
             shopId,
             categoryId,
             name,
@@ -687,7 +711,7 @@ export const useAppStore = create<AppState>()(
             image: finalImage,
             ...(unit === 'KG' ? { pricePerKg: price } : { pricePerItem: price }),
           });
-          set(state => ({ items: [...state.items, res.data] }));
+          // Note: Socket event 'item_created' will update the store
         } catch (err) {
           console.error('Failed to add item', err);
         }
@@ -747,11 +771,11 @@ export const useAppStore = create<AppState>()(
       addOffer: async (offerData) => {
         const { currentTenantId } = get();
         try {
-          const res = await api.post('/catalog/offers', {
+          await api.post('/catalog/offers', {
             shopId: currentTenantId,
             ...offerData,
           });
-          set(state => ({ offers: [...state.offers, res.data] }));
+          // Note: Socket event 'offer_created' will update the store
         } catch (err: any) {
           console.error('Failed to add offer:', err);
           throw err;
@@ -818,6 +842,22 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      updateKgWeight: async (orderId, items) => {
+        try {
+          const res = await api.patch(`/orders/${orderId}/kg-weight`, { items });
+          if (res.data) {
+            set(state => ({
+              orders: state.orders.map(o => o._id === orderId ? res.data : o),
+            }));
+            return { success: true };
+          }
+          return { success: false, message: 'Failed to update KG weights' };
+        } catch (err: any) {
+          console.error('Failed to update KG weights:', err);
+          return { success: false, message: err.response?.data?.error || err.message || 'Failed to update KG weights' };
+        }
+      },
+
       // recordPayment — now persists to backend via dedicated endpoint
       recordPayment: async (orderId, paymentMode) => {
         try {
@@ -829,6 +869,7 @@ export const useAppStore = create<AppState>()(
           console.error('Failed to record payment:', err);
         }
       },
+
 
       // ── Super Admin Actions ──────────────────────────────────────────────────
       createShop: async (name, branches, upiId, bankName, accountNo, adminEmail) => {

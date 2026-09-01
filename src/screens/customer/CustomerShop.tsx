@@ -402,8 +402,10 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
           ) : (
             catItems.map((item) => {
               const qty = getQuantity(item._id);
-              const price = (item as any).pricePerKg || (item as any).pricePerItem || (item as any).price || 0;
-              const unit = item.pricePerKg ? 'KG' : 'Item';
+              const isKg = Boolean(item.pricePerKg && item.pricePerKg > 0) || 
+                item.unit === 'KG' || 
+                (typeof item.name === 'string' && (item.name.toLowerCase().includes('per kg') || item.name.toLowerCase().includes('/ kg') || item.name.toLowerCase().includes('per-kg')));
+              const price = item.pricePerItem || item.price || 0;
 
               return (
                 <View key={item._id} style={styles.itemCard}>
@@ -426,10 +428,19 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
                       </Text>
                     ) : null}
 
-                    <View style={styles.priceRow}>
-                      <Text style={styles.itemPrice}>₹{price}</Text>
-                      <Text style={styles.itemUnit}>/{unit}</Text>
-                    </View>
+                    {isKg ? (
+                      <View style={{ marginTop: 4 }}>
+                        <View style={{ backgroundColor: '#0284C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start' }}>
+                          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>🏋️ PER KG</Text>
+                        </View>
+                        <Text style={{ fontSize: 9, color: '#6B7280', fontWeight: '800', marginTop: 2 }}>Priced at delivery</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.priceRow}>
+                        <Text style={styles.itemPrice}>₹{price}</Text>
+                        <Text style={styles.itemUnit}>/Item</Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Stepper / ADD CTA */}
@@ -476,7 +487,18 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
               <Text style={styles.cartItemsCount}>
                 {cart.length} ITEM{cart.length > 1 ? 'S' : ''} ADDED
               </Text>
-              <Text style={styles.cartTotalPrice}>₹{cartTotal}</Text>
+              {(() => {
+                const isKgCheck = (c: any) => c.unit === 'KG' || Boolean(c.pricePerKg && c.pricePerKg > 0) || (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg')));
+                const hasKg = cart.some(isKgCheck);
+                const perItemTotal = cart.filter(c => !isKgCheck(c)).reduce((s, c) => s + (c.price || 0) * c.quantity, 0);
+                return hasKg ? (
+                  <Text style={styles.cartTotalPrice}>
+                    {perItemTotal > 0 ? `₹${perItemTotal} + KG Pending` : 'Pending Weighing'}
+                  </Text>
+                ) : (
+                  <Text style={styles.cartTotalPrice}>₹{cartTotal}</Text>
+                );
+              })()}
             </View>
             <View style={styles.cartCheckoutBtn}>
               <Text style={styles.cartCheckoutText}>Checkout</Text>
@@ -487,6 +509,7 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
           </BouncyCard>
         </View>
       )}
+
     </View>
   );
 };

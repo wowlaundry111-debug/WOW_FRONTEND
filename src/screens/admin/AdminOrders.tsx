@@ -286,6 +286,18 @@ export const AdminOrdersScreen: React.FC = () => {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={styles.orderTotal}>₹{order.totalAmount || 0}</Text>
+                  {(() => {
+                    const isKgCheck = (it: any) => it.unit === 'KG' || (typeof it.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) || Boolean(it.kgWeight && it.kgWeight > 0);
+                    const hasKg = order.items?.some(isKgCheck);
+                    if (!hasKg) return null;
+                    return (
+                      <View style={{ backgroundColor: order.kgPriceUpdated ? '#DCFCE7' : '#FEF08A', borderWidth: 1, borderColor: COLORS.black, paddingHorizontal: 4, paddingVertical: 1, borderRadius: RADIUS.sm, marginTop: 2 }}>
+                        <Text style={{ fontSize: 8, fontWeight: '900', color: COLORS.black }}>
+                          {order.kgPriceUpdated ? 'KG WEIGHED ✓' : '+ KG PENDING'}
+                        </Text>
+                      </View>
+                    );
+                  })()}
                   {order.paymentMode ? (
                     <View style={{ backgroundColor: order.paymentMode === 'COD' ? COLORS.secondary : COLORS.primary, borderWidth: 1, borderColor: COLORS.black, paddingHorizontal: 5, paddingVertical: 1, borderRadius: RADIUS.sm, marginTop: 2 }}>
                       <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>
@@ -294,6 +306,7 @@ export const AdminOrdersScreen: React.FC = () => {
                     </View>
                   ) : null}
                 </View>
+
               </View>
 
               {/* Items Summary */}
@@ -396,9 +409,29 @@ export const AdminOrdersScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 380 }}>
+            <ScrollView style={{ maxHeight: 420 }}>
+              {selectedOrder && (
+                <View style={{ backgroundColor: '#F8FAFC', padding: 10, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#475569', marginBottom: 4 }}>ORDERED ITEMS:</Text>
+                  {selectedOrder.items?.map((it, idx) => {
+                    const isKg = it.unit === 'KG' || (typeof it.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) || Boolean(it.kgWeight && it.kgWeight > 0);
+                    return (
+                      <View key={`${it.itemId}-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.black }}>
+                          {it.quantity}x {it.name} {isKg ? (it.kgWeight ? `(${it.kgWeight} KG)` : '(KG - Pending)') : ''}
+                        </Text>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: isKg && !it.kgWeight ? '#0284C7' : COLORS.black }}>
+                          {isKg && !it.kgWeight ? 'Pending' : `₹${(it.price || 0) * (isKg ? (it.kgWeight || 1) : it.quantity)}`}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>TOTAL AMOUNT (₹)</Text>
+
                 <TextInput
                   style={styles.modalInput}
                   value={editPrice}
