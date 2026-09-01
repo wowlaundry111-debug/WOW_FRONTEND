@@ -14,13 +14,17 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://backend-5r04.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://wow-backend-isuq.onrender.com/api"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://wow-backend-isuq.onrender.com/api"
+      }
     }
   },
+
   "submit": {
     "production": {}
   }
