@@ -13,10 +13,14 @@
       "android": {
         "buildType": "apk"
       },
+      "ios": {
+        "simulator": true
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://wow-backend-isuq.onrender.com/api"
       }
     },
+
     "production": {
       "autoIncrement": true,
       "env": {
