@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowRight, ArrowLeft, User, Phone, Mail } from 'lucide-react-native';
+import { ArrowRight, ArrowLeft, User, Phone, Mail, Lock } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 import { useAppStore } from '../../store/useAppStore';
@@ -28,6 +28,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onRegist
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const isValid = name.trim().length >= 2 && phone.length === 10 && email.includes('@');
@@ -38,7 +39,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onRegist
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setLoading(true);
 
-    const res = await register(name, phone, email);
+    const res = await register(name, phone, email, password ? password.trim() : undefined);
     setLoading(false);
 
     if (res.success) {
@@ -117,6 +118,21 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onRegist
             />
           </View>
 
+          {/* Password (Optional) */}
+          <Text style={styles.inputLabel}>PASSWORD (OPTIONAL)</Text>
+          <View style={styles.inputWrap}>
+            <Lock size={18} color={COLORS.black} strokeWidth={2.5} />
+            <TextInput
+              style={styles.input}
+              placeholder="Create password (optional)"
+              placeholderTextColor="#6B7280"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+          </View>
+
           {/* Submit */}
           <TouchableOpacity
             style={[styles.btn, !isValid && styles.btnDisabled]}
@@ -128,7 +144,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onRegist
               <ActivityIndicator color={COLORS.black} />
             ) : (
               <View style={styles.btnContent}>
-                <Text style={styles.btnText}>REGISTER & CONTINUE</Text>
+                <Text style={styles.btnText}>REGISTER & SIGN IN</Text>
                 <ArrowRight size={18} color={COLORS.black} strokeWidth={3} />
               </View>
             )}

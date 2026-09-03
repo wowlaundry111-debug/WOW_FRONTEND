@@ -47,8 +47,8 @@ interface AppState {
 
   // Async Data Fetching
   initializeAppData: () => Promise<void>;
-  login: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
-  register: (name: string, phone: string, email: string) => Promise<{ success: boolean; message: string }>;
+  login: (identifier: string, password?: string) => Promise<{ success: boolean; message: string }>;
+  register: (name: string, phone: string, email: string, password?: string) => Promise<{ success: boolean; message: string }>;
   fetchCatalog: (overrideShopId?: string) => Promise<void>;
   fetchOrders: (page?: number) => Promise<void>;
   fetchUsers: () => Promise<void>;
@@ -277,13 +277,17 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      login: async (email, otp) => {
+      login: async (identifier, password) => {
         try {
           set({ isLoading: true, error: null });
-          const response = await api.post('/auth/verify-otp', { email, otp });
+          const response = await api.post('/auth/login', {
+            identifier,
+            email: identifier,
+            password,
+          });
           const { user, token } = response.data;
 
-          setAuthToken(token);
+          if (token) await setAuthToken(token);
 
           const defaultShop = get().shops[0]?._id || '';
           const effectiveShop = user.role === 'SuperAdmin'
@@ -329,13 +333,35 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      register: async (name, phone, email) => {
+      register: async (name, phone, email, password) => {
         try {
           set({ isLoading: true, error: null });
-          const response = await api.post('/auth/register', { name, phone, email });
-          set({ isLoading: false });
+          const response = await api.post('/auth/register', { name, phone, email, password });
+          const { user, token } = response.data;
 
-          let message = response.data.message || 'OTP sent successfully!';
+          if (token && user) {
+            await setAuthToken(token);
+            const defaultShop = get().shops[0]?._id || '';
+            const effectiveShop = user.role === 'SuperAdmin'
+              ? ''
+              : (user.shopId || get().currentTenantId || defaultShop);
+
+            set({
+              currentUser: user,
+              currentRole: user.role,
+              currentTenantId: effectiveShop,
+              shopsLastFetched: 0,
+              offersLastFetched: 0,
+              catalogLastFetched: 0,
+              isLoading: false,
+            });
+
+            await get().initializeAppData();
+          } else {
+            set({ isLoading: false });
+          }
+
+          let message = response.data.message || 'Registered successfully!';
           return { success: true, message };
         } catch (err: any) {
           const msg = err.response?.data?.error || 'Registration failed';
