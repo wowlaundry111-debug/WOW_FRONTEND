@@ -8,7 +8,12 @@ web-build/
 expo-env.d.ts
 
 # Git repository
+.git
 .git/
+
+# APKs and builds
+*.apk
+*.aab
 
 # Unused large asset folders
 assets/final_vectors/
