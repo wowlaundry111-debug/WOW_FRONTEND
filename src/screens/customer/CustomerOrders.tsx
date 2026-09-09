@@ -289,9 +289,13 @@ export const CustomerOrdersScreen = () => {
                         <View style={{ gap: 8 }}>
                           {perItemProducts.length > 0 && (
                             <View style={{ backgroundColor: '#F1F5F9', padding: 8, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                              <Text style={{ fontSize: 11, fontWeight: '900', color: '#334155', marginBottom: 2 }}>📦 PER-ITEM ITEMS ({perItemProducts.length}):</Text>
+                              <Text style={{ fontSize: 11, fontWeight: '900', color: '#334155', marginBottom: 2 }}>PER-ITEM ITEMS ({perItemProducts.length}):</Text>
                               <Text style={styles.itemsListText}>
-                                {perItemProducts.map((i) => `${i.quantity}× ${i.name} (₹${(i.price || 0) * i.quantity})`).join(' • ')}
+                                {perItemProducts.map((i) => {
+                                  const catBreadcrumb = (i.categoryName || i.subCategoryName) ? ` [${i.categoryName}${i.subCategoryName ? ` › ${i.subCategoryName}` : ''}]` : '';
+                                  const bucketTag = i.isBucket ? ' [Bucket]' : '';
+                                  return `${i.quantity}× ${i.name}${bucketTag}${catBreadcrumb} (₹${(i.price || 0) * i.quantity})`;
+                                }).join(' • ')}
                               </Text>
                             </View>
                           )}
@@ -299,15 +303,19 @@ export const CustomerOrdersScreen = () => {
                           {perKgProducts.length > 0 && (
                             <View style={{ backgroundColor: '#EFF6FF', padding: 8, borderRadius: 10, borderWidth: 1, borderColor: '#BAE6FD' }}>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                                <Text style={{ fontSize: 11, fontWeight: '900', color: '#0369A1' }}>⚖️ PER-KG CLOTHES ({perKgProducts.length}):</Text>
+                                <Text style={{ fontSize: 11, fontWeight: '900', color: '#0369A1' }}>PER-KG CLOTHES ({perKgProducts.length}):</Text>
                                 <View style={{ backgroundColor: order.kgPriceUpdated ? '#B0FF49' : '#FEF08A', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black }}>
                                   <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>
-                                    {order.kgPriceUpdated ? 'WEIGHED ✓' : 'PENDING WEIGHING'}
+                                    {order.kgPriceUpdated ? 'WEIGHED' : 'PENDING WEIGHING'}
                                   </Text>
                                 </View>
                               </View>
                               <Text style={[styles.itemsListText, { color: '#0369A1' }]}>
-                                {perKgProducts.map((i) => `${i.quantity}× ${i.name} ${i.kgWeight ? `(${i.kgWeight} KG = ₹${i.price})` : '(Weight taken at delivery)'}`).join(' • ')}
+                                {perKgProducts.map((i) => {
+                                  const catBreadcrumb = (i.categoryName || i.subCategoryName) ? ` [${i.categoryName}${i.subCategoryName ? ` › ${i.subCategoryName}` : ''}]` : '';
+                                  const bucketTag = i.isBucket ? ' [Bucket]' : '';
+                                  return `${i.quantity}× ${i.name}${bucketTag}${catBreadcrumb} ${i.kgWeight ? `(${i.kgWeight} KG = ₹${i.price})` : '(Weight taken at delivery)'}`;
+                                }).join(' • ')}
                               </Text>
                             </View>
                           )}
@@ -378,7 +386,7 @@ export const CustomerOrdersScreen = () => {
                                 </View>
                               ) : hasKg && order.kgPriceUpdated ? (
                                 <View style={{ backgroundColor: '#B0FF49', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>KG CALCULATED ✓</Text>
+                                  <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>KG CALCULATED</Text>
                                 </View>
                               ) : null}
                             </View>

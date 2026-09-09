@@ -441,6 +441,12 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
     );
   }
 
+  const cartScrollRef = React.useRef<ScrollView>(null);
+
+  React.useEffect(() => {
+    cartScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
+
   // ─── Filled Cart / Checkout Screen ───────────────────────────────────────
   return (
     <View style={styles.root}>
@@ -450,6 +456,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
       <View style={styles.topOverscrollFiller} />
 
       <ScrollView
+        ref={cartScrollRef}
         keyboardShouldPersistTaps="handled"
         style={styles.scrollArea}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 }]}
@@ -639,7 +646,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                     </View>
                     <View style={[styles.addonPriceBadge, isSelected && styles.addonPriceBadgeActive]}>
                       <Text style={[styles.addonPriceText, isSelected && styles.addonPriceTextActive]}>
-                        {isSelected ? '✓ ADDED' : `+₹${pref.price}`}
+                        {isSelected ? 'ADDED' : `+₹${pref.price}`}
                       </Text>
                     </View>
                   </BouncyCard>
@@ -658,10 +665,20 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                 return (
                   <View key={item.itemId}>
                     <View style={styles.cartItemRow}>
-                      <View style={{ flex: 1 }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
                         <Text style={styles.cartItemName}>{item.name}</Text>
+                        {(item.categoryName || item.subCategoryName) && (
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748B', marginTop: 1 }}>
+                            {item.categoryName}{item.subCategoryName ? ` › ${item.subCategoryName}` : ''}{item.isBucket ? ' • Bucket' : ''}
+                          </Text>
+                        )}
+                        {item.isBucket && !item.categoryName && (
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: COLORS.black, backgroundColor: COLORS.secondary, alignSelf: 'flex-start', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, marginTop: 1 }}>
+                            Bucket
+                          </Text>
+                        )}
                         {isKg ? (
-                          <Text style={[styles.cartItemRate, { color: '#0284C7', fontWeight: '800' }]}>🏋️ Weighed at delivery</Text>
+                          <Text style={[styles.cartItemRate, { color: '#0284C7', fontWeight: '800' }]}>Weighed at delivery</Text>
                         ) : (
                           <Text style={styles.cartItemRate}>₹{item.price} per unit</Text>
                         )}
@@ -757,7 +774,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
             </View>
             {hasKgItems && (
               <View style={[styles.billRow, { backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, marginTop: 4 }]}>
-                <Text style={[styles.billLabel, { color: '#0284C7', fontWeight: '800' }]}>🏋️ KG Clothes</Text>
+                <Text style={[styles.billLabel, { color: '#0284C7', fontWeight: '800' }]}>KG Clothes</Text>
                 <Text style={[styles.billVal, { color: '#0284C7', fontWeight: '800' }]}>Weighed at delivery</Text>
               </View>
             )}

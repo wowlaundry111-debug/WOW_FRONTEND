@@ -172,6 +172,11 @@ const VerifyOrderModal = ({
               <View key={it.itemId} style={styles.verifyRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.verifyItemName}>{it.name}</Text>
+                  {(it.categoryName || it.subCategoryName) && (
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B', marginTop: 1 }}>
+                      {it.categoryName}{it.subCategoryName ? ` › ${it.subCategoryName}` : ''}{it.isBucket ? ' • Bucket' : ''}
+                    </Text>
+                  )}
                   <Text style={styles.verifyItemQty}>Stated qty: {it.quantity}</Text>
                 </View>
                 <View style={styles.stepperWrap}>
@@ -274,7 +279,7 @@ const WeighKgModal = ({
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalHeading}>⚖️ WEIGH KG CLOTHES</Text>
+          <Text style={styles.modalHeading}>WEIGH KG CLOTHES</Text>
           <Text style={{ fontSize: 13, color: '#4B5563', marginBottom: 16 }}>
             Enter the exact weight (in KG) measured on the scale.
           </Text>
@@ -289,7 +294,14 @@ const WeighKgModal = ({
               return (
                 <View key={it.itemId} style={[styles.verifyRow, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={[styles.verifyItemName, { flex: 1 }]}>{it.name}</Text>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.verifyItemName}>{it.name}</Text>
+                      {(it.categoryName || it.subCategoryName) && (
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B', marginTop: 1 }}>
+                          {it.categoryName}{it.subCategoryName ? ` › ${it.subCategoryName}` : ''}{it.isBucket ? ' • Bucket' : ''}
+                        </Text>
+                      )}
+                    </View>
                     <Text style={{ fontSize: 13, fontWeight: '800', color: '#0369A1' }}>₹{rate}/KG</Text>
                   </View>
 
@@ -736,7 +748,7 @@ export const DeliveryTasksScreen = () => {
               {order.items && order.items.length > 0 && (
                 <View style={styles.itemsRow}>
                   <Text style={styles.itemsSummaryText} numberOfLines={1}>
-                    {order.items.map((it) => `${it.quantity}x ${it.name}`).join(' · ')}
+                    {order.items.map((it) => `${it.quantity}x ${it.name}${(it.categoryName || it.subCategoryName) ? ` [${it.categoryName || ''}${it.subCategoryName ? ` › ${it.subCategoryName}` : ''}]` : ''}`).join(' · ')}
                   </Text>
                 </View>
               )}
@@ -777,7 +789,7 @@ export const DeliveryTasksScreen = () => {
                     }}
                   >
                     <Text style={{ fontSize: 12, fontWeight: '900', color: COLORS.black }}>
-                      {order.kgPriceUpdated ? '⚖️ EDIT KG WEIGHTS (WEIGHED ✓)' : '⚖️ WEIGH KG CLOTHES (REQUIRED)'}
+                      {order.kgPriceUpdated ? 'EDIT KG WEIGHTS (WEIGHED)' : 'WEIGH KG CLOTHES (REQUIRED)'}
                     </Text>
                   </TouchableOpacity>
                 );

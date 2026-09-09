@@ -48,6 +48,8 @@ interface AppState {
   // Async Data Fetching
   initializeAppData: () => Promise<void>;
   login: (identifier: string, password?: string) => Promise<{ success: boolean; message: string }>;
+  sendLoginOtp: (identifier: string, password?: string) => Promise<{ success: boolean; requiresOtp?: boolean; message: string }>;
+  verifyLoginOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
   register: (name: string, phone: string, email: string, password?: string) => Promise<{ success: boolean; message: string }>;
   fetchCatalog: (overrideShopId?: string) => Promise<void>;
   fetchOrders: (page?: number) => Promise<void>;
@@ -67,10 +69,10 @@ interface AppState {
   updateOrderStatus: (orderId: string, status: OrderStatus, paymentMode?: PaymentMode, paymentStatus?: PaymentStatus) => Promise<void>;
   updateOrderAdminDetails: (orderId: string, updates: { totalAmount?: number, adminNotes?: string }) => Promise<void>;
   assignDeliveryBoy: (orderId: string, deliveryBoyId: string) => Promise<void>;
-  addCategory: (name: string, image?: string, overrideShopId?: string) => Promise<void>;
+  addCategory: (name: string, image?: string, overrideShopId?: string, parentCategoryId?: string) => Promise<void>;
   updateCategory: (categoryId: string, updates: Partial<Category>) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
-  addCatalogItem: (categoryId: string, name: string, description: string, price: number, unit: 'KG' | 'ITEM', image?: string) => Promise<void>;
+  addCatalogItem: (categoryId: string, name: string, description: string, price: number, unit: 'KG' | 'ITEM', image?: string, isBucket?: boolean) => Promise<void>;
   updateCatalogItem: (itemId: string, updates: Partial<Item>) => Promise<void>;
   updateCatalogItemPrice: (itemId: string, price: number, unit: 'KG' | 'ITEM') => Promise<void>;
   deleteCatalogItem: (itemId: string) => Promise<void>;
@@ -315,6 +317,89 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // OTP-based login — Step 1: request OTP (matches website flow)
+      // Staff accounts (ShopAdmin, Delivery, SuperAdmin) receive directLogin:true immediately.
+      sendLoginOtp: async (identifier, password) => {
+        try {
+          set({ isLoading: true, error: null });
+          const response = await api.post('/auth/send-otp', {
+            identifier,
+            email: identifier,
+            password,
+          });
+
+          // Staff or direct login bypass: JWT returned immediately
+          if (response.data.directLogin && response.data.token) {
+            const { user, token } = response.data;
+            if (token) await setAuthToken(token);
+
+            const defaultShop = get().shops[0]?._id || '';
+            const effectiveShop = user.role === 'SuperAdmin'
+              ? ''
+              : (user.shopId || get().currentTenantId || defaultShop);
+
+            set({
+              currentUser: user,
+              currentRole: user.role,
+              currentTenantId: effectiveShop,
+              shopsLastFetched: 0,
+              offersLastFetched: 0,
+              catalogLastFetched: 0,
+              isLoading: false,
+            });
+            await get().initializeAppData();
+            return { success: true, requiresOtp: false, message: 'Logged in successfully' };
+          }
+
+          set({ isLoading: false });
+          return {
+            success: true,
+            requiresOtp: true,
+            message: response.data.message || 'Verification code sent to your email',
+          };
+        } catch (err: any) {
+          const msg = err.response?.data?.error || 'Failed to send verification code';
+          set({ isLoading: false, error: msg });
+          return { success: false, message: msg };
+        }
+      },
+
+      // OTP-based login — Step 2: verify OTP and complete login
+      verifyLoginOtp: async (email, otp) => {
+        try {
+          set({ isLoading: true, error: null });
+          const response = await api.post('/auth/login', {
+            identifier: email,
+            email,
+            otp,
+          });
+          const { user, token } = response.data;
+
+          if (token) await setAuthToken(token);
+
+          const defaultShop = get().shops[0]?._id || '';
+          const effectiveShop = user.role === 'SuperAdmin'
+            ? ''
+            : (user.shopId || get().currentTenantId || defaultShop);
+
+          set({
+            currentUser: user,
+            currentRole: user.role,
+            currentTenantId: effectiveShop,
+            shopsLastFetched: 0,
+            offersLastFetched: 0,
+            catalogLastFetched: 0,
+            isLoading: false,
+          });
+          await get().initializeAppData();
+          return { success: true, message: 'Authenticated successfully' };
+        } catch (err: any) {
+          const msg = err.response?.data?.error || 'Invalid verification code';
+          set({ isLoading: false, error: msg });
+          return { success: false, message: msg };
+        }
+      },
+
       updateProfile: async (updates) => {
         try {
           const { currentUser } = get();
@@ -499,6 +584,19 @@ export const useAppStore = create<AppState>()(
             set({ cart: newCart });
           }
         } else if (quantity > 0) {
+          const { categories } = get();
+          const cat = categories.find(c => c._id === item.categoryId);
+          let categoryName = '';
+          let subCategoryName = '';
+          if (cat) {
+            if (cat.parentCategoryId) {
+              const parentCat = categories.find(c => c._id === cat.parentCategoryId);
+              categoryName = parentCat?.name || '';
+              subCategoryName = cat.name;
+            } else {
+              categoryName = cat.name;
+            }
+          }
           set({
             cart: [...cart, {
               itemId: item._id,
@@ -507,6 +605,9 @@ export const useAppStore = create<AppState>()(
               price: resolvedPrice,
               unit: resolvedUnit,
               image: item.image,
+              categoryName,
+              subCategoryName,
+              isBucket: !!item.isBucket,
             }]
           });
         }
@@ -586,6 +687,9 @@ export const useAppStore = create<AppState>()(
             quantity: c.quantity,
             unit: isKg ? 'KG' : 'ITEM',
             price: isKg ? 0 : (c.price || 0),
+            categoryName: c.categoryName,
+            subCategoryName: c.subCategoryName,
+            isBucket: c.isBucket,
           };
         });
 
@@ -676,11 +780,11 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      addCategory: async (name, image, overrideShopId) => {
+      addCategory: async (name, image, overrideShopId, parentCategoryId) => {
         const shopId = overrideShopId || get().currentTenantId;
         try {
           let finalImage = image ? await uploadImageToCloudinary(image) : undefined;
-          await api.post('/catalog/categories', { shopId, name, image: finalImage });
+          await api.post('/catalog/categories', { shopId, name, image: finalImage, parentCategoryId: parentCategoryId || null });
           // Note: Socket event 'category_created' will update the store
         } catch (err) {
           console.error('Failed to add category', err);
@@ -709,10 +813,13 @@ export const useAppStore = create<AppState>()(
       deleteCategory: async (categoryId) => {
         const prevCategories = get().categories;
         const prevItems = get().items;
-        // Optimistic update
+        // Optimistic update — also remove sub-categories and their items
+        const subCatIds = get().categories
+          .filter(c => c.parentCategoryId === categoryId)
+          .map(c => c._id);
         set(state => ({
-          categories: state.categories.filter(c => c._id !== categoryId),
-          items: state.items.filter(i => i.categoryId !== categoryId),
+          categories: state.categories.filter(c => c._id !== categoryId && c.parentCategoryId !== categoryId),
+          items: state.items.filter(i => i.categoryId !== categoryId && !subCatIds.includes(i.categoryId)),
         }));
         try {
           await api.delete(`/catalog/categories/${categoryId}`);
@@ -723,7 +830,7 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      addCatalogItem: async (categoryId, name, description, price, unit, image) => {
+      addCatalogItem: async (categoryId, name, description, price, unit, image, isBucket) => {
         const { categories, currentTenantId } = get();
         const cat = categories.find(c => c._id === categoryId);
         const shopId = cat ? cat.shopId : currentTenantId;
@@ -735,6 +842,7 @@ export const useAppStore = create<AppState>()(
             name,
             description,
             image: finalImage,
+            isBucket: !!isBucket,
             ...(unit === 'KG' ? { pricePerKg: price } : { pricePerItem: price }),
           });
           // Note: Socket event 'item_created' will update the store
