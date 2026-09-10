@@ -524,7 +524,7 @@ export const useAppStore = create<AppState>()(
 
       fetchUsers: async () => {
         const role = get().currentUser?.role;
-        if (!['SuperAdmin', 'ShopAdmin'].includes(role || '')) {
+        if (!['SuperAdmin', 'ShopAdmin', 'Admin'].includes(role || '')) {
           return;
         }
         try {
