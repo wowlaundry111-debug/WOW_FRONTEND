@@ -70,6 +70,10 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
   if (!category) return null;
 
   const handleAddItem = () => {
+    if (!category?.parentCategoryId) {
+      Alert.alert('Sub-Category Required', 'Items can only be created inside a sub-category. Please select or create a sub-category first.');
+      return;
+    }
     if (!newItemName.trim() || !newItemPrice.trim()) {
       Alert.alert('Required', 'Please enter a name and price');
       return;
@@ -254,8 +258,17 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
               </View>
             )}
 
-            {/* Add Service Section / Button */}
-            {!isAdding ? (
+            {/* Add Service Section / Button — strictly allowed in sub-categories only */}
+            {!category.parentCategoryId ? (
+              <View style={{ marginVertical: 12, padding: 14, backgroundColor: '#FEF3C7', borderColor: '#D97706', borderWidth: 2, borderRadius: 14 }}>
+                <Text style={{ fontSize: 12, fontWeight: '900', color: '#92400E', textTransform: 'uppercase' }}>
+                  Items are only valid in sub-categories
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#78350F', marginTop: 3 }}>
+                  Individual service items must belong to a sub-category. Please open a sub-category to create and manage items.
+                </Text>
+              </View>
+            ) : !isAdding ? (
               <TouchableOpacity
                 style={styles.addServiceCTA}
                 activeOpacity={0.85}

@@ -784,8 +784,12 @@ export const useAppStore = create<AppState>()(
         const shopId = overrideShopId || get().currentTenantId;
         try {
           let finalImage = image ? await uploadImageToCloudinary(image) : undefined;
-          await api.post('/catalog/categories', { shopId, name, image: finalImage, parentCategoryId: parentCategoryId || null });
-          // Note: Socket event 'category_created' will update the store
+          const res = await api.post('/catalog/categories', { shopId, name, image: finalImage, parentCategoryId: parentCategoryId || null });
+          if (res.data) {
+            set(state => ({
+              categories: state.categories.some(c => c._id === res.data._id) ? state.categories : [...state.categories, res.data]
+            }));
+          }
         } catch (err) {
           console.error('Failed to add category', err);
         }
@@ -836,7 +840,7 @@ export const useAppStore = create<AppState>()(
         const shopId = cat ? cat.shopId : currentTenantId;
         try {
           let finalImage = image ? await uploadImageToCloudinary(image) : undefined;
-          await api.post('/catalog/items', {
+          const res = await api.post('/catalog/items', {
             shopId,
             categoryId,
             name,
@@ -845,7 +849,11 @@ export const useAppStore = create<AppState>()(
             isBucket: !!isBucket,
             ...(unit === 'KG' ? { pricePerKg: price } : { pricePerItem: price }),
           });
-          // Note: Socket event 'item_created' will update the store
+          if (res.data) {
+            set(state => ({
+              items: state.items.some(i => i._id === res.data._id) ? state.items : [...state.items, res.data]
+            }));
+          }
         } catch (err) {
           console.error('Failed to add item', err);
         }
