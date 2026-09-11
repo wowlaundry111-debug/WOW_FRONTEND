@@ -164,9 +164,10 @@ export const useAppStore = create<AppState>()(
       setCurrentUser: (user) => {
         if (user) {
           const effectiveShop = user.role === 'SuperAdmin' ? '' : (user.shopId || get().currentTenantId || '');
+          const safeRole = ((user.role as string) === 'Admin' ? 'ShopAdmin' : user.role) as Role;
           set({
             currentUser: user,
-            currentRole: user.role,
+            currentRole: safeRole,
             currentTenantId: effectiveShop,
           });
           if (effectiveShop) {
@@ -300,9 +301,10 @@ export const useAppStore = create<AppState>()(
             : (user.shopId || get().currentTenantId || defaultShop);
 
           // Reset TTLs so initializeAppData always re-fetches shops/offers on login
+          const safeRole = ((user.role as string) === 'Admin' ? 'ShopAdmin' : user.role) as Role;
           set({
             currentUser: user,
-            currentRole: user.role,
+            currentRole: safeRole,
             currentTenantId: effectiveShop,
             shopsLastFetched: 0,
             offersLastFetched: 0,
@@ -341,9 +343,10 @@ export const useAppStore = create<AppState>()(
               ? ''
               : (user.shopId || get().currentTenantId || defaultShop);
 
+            const safeRole = ((user.role as string) === 'Admin' ? 'ShopAdmin' : user.role) as Role;
             set({
               currentUser: user,
-              currentRole: user.role,
+              currentRole: safeRole,
               currentTenantId: effectiveShop,
               shopsLastFetched: 0,
               offersLastFetched: 0,
