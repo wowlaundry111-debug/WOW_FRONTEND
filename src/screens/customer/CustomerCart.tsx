@@ -296,6 +296,11 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   const [couponCode, setCouponCode] = useState('');
   const [couponMsg, setCouponMsg] = useState<{ type: string; text: string }>({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
+  const cartScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    cartScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
 
   const handleAutoDetect = async () => {
     setIsDetectingLoc(true);
@@ -440,12 +445,6 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
       </View>
     );
   }
-
-  const cartScrollRef = React.useRef<ScrollView>(null);
-
-  React.useEffect(() => {
-    cartScrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, []);
 
   // ─── Filled Cart / Checkout Screen ───────────────────────────────────────
   return (
