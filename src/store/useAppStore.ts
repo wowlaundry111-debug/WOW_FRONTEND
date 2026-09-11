@@ -717,10 +717,18 @@ export const useAppStore = create<AppState>()(
             deliveryAddress,
             pickupTime,
           });
-          const newOrder = res.data;
+          const rawOrder = res.data;
+          const newOrder = {
+            ...rawOrder,
+            _id: String(rawOrder._id || `ord_${Date.now()}`),
+            customerId: String(rawOrder.customerId || currentUser._id),
+            createdAt: rawOrder.createdAt || new Date().toISOString(),
+            items: Array.isArray(rawOrder.items) ? rawOrder.items : [],
+            status: rawOrder.status || 'PLACED',
+          };
 
           set(state => ({
-            orders: [newOrder, ...state.orders],
+            orders: [newOrder, ...state.orders.filter(o => String(o._id) !== String(newOrder._id))],
             cart: [],
             activeCoupon: null,
             deliveryInstructions: '',

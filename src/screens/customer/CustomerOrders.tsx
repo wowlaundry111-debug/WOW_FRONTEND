@@ -154,12 +154,19 @@ export const CustomerOrdersScreen = () => {
   const [refreshing, setRefreshing] = React.useState(false);
   const myOrders = React.useMemo(() => {
     const map = new Map<string, (typeof orders)[0]>();
-    orders
-      .filter((o) => o.customerId === currentUser?._id)
-      .forEach((o) => map.set(o._id, o));
-    return Array.from(map.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    (orders || [])
+      .filter((o) => o && (o.customerId === currentUser?._id || !currentUser?._id))
+      .forEach((o) => {
+        if (o) {
+          const id = String(o._id || (o as any).id || Math.random());
+          map.set(id, o);
+        }
+      });
+    return Array.from(map.values()).sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    });
   }, [orders, currentUser?._id]);
 
   const onRefresh = React.useCallback(async () => {
@@ -257,33 +264,57 @@ export const CustomerOrdersScreen = () => {
             </View>
           ) : (
             myOrders.map((order, orderIdx) => {
-              const activeStepIndex = getStepIdx(order.status);
+              if (!order) return null;
+              const activeStepIndex = getStepIdx(order.status || 'PLACED');
+              const orderIdStr = String(order._id || (order as any).id || `ORD-${orderIdx}`);
+              const displayId = orderIdStr.length >= 6 ? orderIdStr.slice(-6).toUpperCase() : orderIdStr.toUpperCase();
+
+              const formattedDate = (() => {
+                if (!order.createdAt) return new Date().toLocaleDateString();
+                const d = new Date(order.createdAt);
+                return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
+              })();
+
+              const formattedTime = (() => {
+                if (!order.createdAt) return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const d = new Date(order.createdAt);
+                return isNaN(d.getTime()) ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              })();
+
+              const safeItems = Array.isArray(order.items) ? order.items : [];
 
               return (
-                <View key={`${order._id}-${orderIdx}`} style={styles.orderCard}>
+                <View key={`${orderIdStr}-${orderIdx}`} style={styles.orderCard}>
                   {/* Order Top Bar */}
                   <View style={styles.orderTopBar}>
                     <View style={{ gap: 4 }}>
                       <View style={styles.orderIdBadge}>
                         <Text style={styles.orderIdBadgeText}>
-                          ORDER #{order._id.slice(-6).toUpperCase()}
+                          ORDER #{displayId}
                         </Text>
                       </View>
                       <Text style={styles.orderDateText}>
-                        {new Date(order.createdAt).toLocaleDateString()} at{' '}
-                        {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formattedDate} at {formattedTime}
                       </Text>
                     </View>
 
-                    <StatusBadge status={order.status as any} />
+                    <StatusBadge status={(order.status || 'PLACED') as any} />
                   </View>
 
                   {/* Items Summary - Split into Per-Item and Per-KG Categories */}
                   <View style={styles.orderBody}>
                     {(() => {
-                      const isKgCheck = (it: any) => it.unit === 'KG' || (typeof it.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) || Boolean(it.kgWeight && it.kgWeight > 0);
-                      const perItemProducts = order.items.filter(it => !isKgCheck(it));
-                      const perKgProducts = order.items.filter(isKgCheck);
+                      const isKgCheck = (it: any) =>
+                        it &&
+                        (it.unit === 'KG' ||
+                          (typeof it.name === 'string' &&
+                            (it.name.toLowerCase().includes('per kg') ||
+                              it.name.toLowerCase().includes('/ kg') ||
+                              it.name.toLowerCase().includes('per-kg'))) ||
+                          Boolean(it.kgWeight && it.kgWeight > 0));
+
+                      const perItemProducts = safeItems.filter((it) => it && !isKgCheck(it));
+                      const perKgProducts = safeItems.filter((it) => it && isKgCheck(it));
 
                       return (
                         <View style={{ gap: 8 }}>
@@ -292,9 +323,12 @@ export const CustomerOrdersScreen = () => {
                               <Text style={{ fontSize: 11, fontWeight: '900', color: '#334155', marginBottom: 2 }}>PER-ITEM ITEMS ({perItemProducts.length}):</Text>
                               <Text style={styles.itemsListText}>
                                 {perItemProducts.map((i) => {
-                                  const catBreadcrumb = (i.categoryName || i.subCategoryName) ? ` [${i.categoryName}${i.subCategoryName ? ` › ${i.subCategoryName}` : ''}]` : '';
+                                  const itemName = i.name || 'Item';
+                                  const catBreadcrumb = (i.categoryName || i.subCategoryName) ? ` [${i.categoryName || ''}${i.subCategoryName ? ` › ${i.subCategoryName}` : ''}]` : '';
                                   const bucketTag = i.isBucket ? ' [Bucket]' : '';
-                                  return `${i.quantity}× ${i.name}${bucketTag}${catBreadcrumb} (₹${(i.price || 0) * i.quantity})`;
+                                  const qty = typeof i.quantity === 'number' ? i.quantity : 1;
+                                  const price = typeof i.price === 'number' ? i.price : 0;
+                                  return `${qty}× ${itemName}${bucketTag}${catBreadcrumb} (₹${price * qty})`;
                                 }).join(' • ')}
                               </Text>
                             </View>
@@ -312,9 +346,11 @@ export const CustomerOrdersScreen = () => {
                               </View>
                               <Text style={[styles.itemsListText, { color: '#0369A1' }]}>
                                 {perKgProducts.map((i) => {
-                                  const catBreadcrumb = (i.categoryName || i.subCategoryName) ? ` [${i.categoryName}${i.subCategoryName ? ` › ${i.subCategoryName}` : ''}]` : '';
+                                  const itemName = i.name || 'Item';
+                                  const catBreadcrumb = (i.categoryName || i.subCategoryName) ? ` [${i.categoryName || ''}${i.subCategoryName ? ` › ${i.subCategoryName}` : ''}]` : '';
                                   const bucketTag = i.isBucket ? ' [Bucket]' : '';
-                                  return `${i.quantity}× ${i.name}${bucketTag}${catBreadcrumb} ${i.kgWeight ? `(${i.kgWeight} KG = ₹${i.price})` : '(Weight taken at delivery)'}`;
+                                  const qty = typeof i.quantity === 'number' ? i.quantity : 1;
+                                  return `${qty}× ${itemName}${bucketTag}${catBreadcrumb} ${i.kgWeight ? `(${i.kgWeight} KG = ₹${i.price || 0})` : '(Weight taken at delivery)'}`;
                                 }).join(' • ')}
                               </Text>
                             </View>
@@ -374,12 +410,19 @@ export const CustomerOrdersScreen = () => {
                       <View>
                         <Text style={styles.totalLabel}>TOTAL AMOUNT</Text>
                         {(() => {
-                          const isKgCheck = (it: any) => it.unit === 'KG' || (typeof it.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) || Boolean(it.kgWeight && it.kgWeight > 0);
-                          const hasKg = order.items.some(isKgCheck);
+                          const isKgCheck = (it: any) =>
+                            it &&
+                            (it.unit === 'KG' ||
+                              (typeof it.name === 'string' &&
+                                (it.name.toLowerCase().includes('per kg') ||
+                                  it.name.toLowerCase().includes('/ kg') ||
+                                  it.name.toLowerCase().includes('per-kg'))) ||
+                              Boolean(it.kgWeight && it.kgWeight > 0));
+                          const hasKg = safeItems.some(isKgCheck);
                           const isPending = hasKg && !order.kgPriceUpdated;
                           return (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                              <Text style={styles.totalValue}>₹{order.totalAmount}</Text>
+                              <Text style={styles.totalValue}>₹{order.totalAmount || 0}</Text>
                               {isPending ? (
                                 <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black }}>
                                   <Text style={{ fontSize: 9, fontWeight: '900', color: '#854D0E' }}>+ KG PENDING</Text>
@@ -406,7 +449,7 @@ export const CustomerOrdersScreen = () => {
                       style={styles.helpBtn}
                       activeOpacity={0.8}
                       onPress={() => {
-                        const orderShop = shops.find((s) => s._id === order.shopId);
+                        const orderShop = (shops || []).find((s) => s && s._id === order.shopId);
                         const contact = orderShop?.contactNumber || '9999999999';
                         Linking.openURL(`tel:${contact}`);
                       }}
