@@ -647,8 +647,27 @@ export const useAppStore = create<AppState>()(
       clearCart: () => set({ cart: [], activeCoupon: null, deliveryInstructions: '' }),
 
       applyCoupon: (code) => {
-        const { offers, cart, currentTenantId } = get();
-        const coupon = offers.find(o => o.code.toUpperCase() === code.toUpperCase() && o.shopId === currentTenantId);
+        const { offers, cart, currentTenantId, shops } = get();
+        const currentShop = shops.find(s => s._id === currentTenantId);
+
+        let coupon: any = offers.find(o => o.code.toUpperCase() === code.toUpperCase() && o.shopId === currentTenantId);
+
+        if (!coupon && currentShop?.promoCode?.code && currentShop.promoCode.code.toUpperCase() === code.toUpperCase()) {
+          if (!currentShop.promoCode.isActive) {
+            return { success: false, message: 'This promo code is currently inactive' };
+          }
+          coupon = {
+            _id: `promo_${currentShop._id}`,
+            shopId: currentShop._id,
+            code: currentShop.promoCode.code.toUpperCase(),
+            discountPercent: currentShop.promoCode.discountPercent,
+            maxDiscount: currentShop.promoCode.maxDiscount ?? 99999,
+            minOrderValue: currentShop.promoCode.minOrderValue ?? 0,
+            description: currentShop.promoCode.description || '',
+            isActive: true,
+          };
+        }
+
         if (!coupon) return { success: false, message: 'Invalid coupon code for this shop' };
 
         const isKgItemCheck = (c: any) => 
@@ -715,6 +734,7 @@ export const useAppStore = create<AppState>()(
             washPreferences,
             totalAmount: finalTotal,
             discountAmount: discount,
+            couponCode: activeCoupon?.code || undefined,
             taxAmount: tax,
             deliveryFee: deliveryFeeAmt,
             pickupAddress: deliveryAddress,

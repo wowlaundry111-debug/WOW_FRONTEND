@@ -32,6 +32,15 @@ export interface PromoBanner {
   type?: 'promo' | 'free';
 }
 
+export interface ShopPromoCode {
+  code: string;
+  discountPercent: number;
+  maxDiscount?: number;
+  minOrderValue?: number;
+  description?: string;
+  isActive: boolean;
+}
+
 export interface Shop {
   _id: string;
   name: string;
@@ -46,6 +55,7 @@ export interface Shop {
   isOpen?: boolean;
   instructions?: string;
   pickupTimings?: string[];
+  promoCode?: ShopPromoCode;
   contactNumber?: string;
   washPreferences?: WashPreference[];
   promoBanners?: PromoBanner[];
@@ -138,6 +148,7 @@ export interface Order {
   taxAmount?: number;
   deliveryFee?: number;
   discountAmount?: number;
+  couponCode?: string;
 
   paymentStatus?: PaymentStatus;
   paymentMode?: PaymentMode;
