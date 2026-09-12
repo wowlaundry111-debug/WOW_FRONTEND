@@ -64,6 +64,7 @@ interface AppState {
   applyCoupon: (code: string) => { success: boolean; message: string };
   removeCoupon: () => void;
   placeOrder: (deliveryAddress: string, pickupTime?: string, washPreferences?: { name: string, price: number }[]) => Promise<{ success: boolean; orderId: string; message: string }>;
+  cancelOrder: (orderId: string, reason?: string) => Promise<{ success: boolean; message?: string }>;
 
   // Actions - Shop Admin Operations
   updateOrderStatus: (orderId: string, status: OrderStatus, paymentMode?: PaymentMode, paymentStatus?: PaymentStatus) => Promise<void>;
@@ -742,6 +743,22 @@ export const useAppStore = create<AppState>()(
         } catch (err: any) {
           set({ isLoading: false, error: err.message || 'Failed to place order' });
           return { success: false, orderId: '', message: err.message || 'Failed to place order' };
+        }
+      },
+
+      cancelOrder: async (orderId: string, reason?: string) => {
+        try {
+          const res = await api.patch(`/orders/${orderId}/cancel`, { reason });
+          if (res.data) {
+            set(state => ({
+              orders: state.orders.map(o => String(o._id) === String(orderId) ? res.data : o)
+            }));
+            return { success: true, message: 'Order cancelled successfully' };
+          }
+          return { success: false, message: 'Failed to cancel order' };
+        } catch (err: any) {
+          const msg = err?.response?.data?.error || err.message || 'Failed to cancel order';
+          return { success: false, message: msg };
         }
       },
 
