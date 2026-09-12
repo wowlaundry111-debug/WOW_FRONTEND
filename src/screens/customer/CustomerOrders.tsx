@@ -543,10 +543,10 @@ export const CustomerOrdersScreen = () => {
                       </View>
 
                       {/* Delivery Rider Contact Icons */}
-                      {order.deliveryBoyName ? (
+                      {(order.deliveryBoyName || order.deliveryBoyId) ? (
                         <View style={styles.contactIconGroup}>
-                          <Text style={styles.contactGroupTag} numberOfLines={1}>
-                            {order.deliveryBoyName.split(' ')[0].toUpperCase()}:
+                          <Text style={styles.contactGroupTag}>
+                            DELIVERY:
                           </Text>
                           {order.deliveryBoyPhone ? (
                             <TouchableOpacity
