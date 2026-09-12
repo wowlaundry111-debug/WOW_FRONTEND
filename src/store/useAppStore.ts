@@ -82,7 +82,7 @@ interface AppState {
 
   // Actions - Delivery Boy Operations
   verifyOrderItems: (orderId: string, itemsCount: Record<string, number>) => Promise<void>;
-  updateKgWeight: (orderId: string, items: { itemId: string; kgWeight: number }[]) => Promise<{ success: boolean; message?: string }>;
+  updateKgWeight: (orderId: string, items: { itemId: string; kgWeight: number }[], markPickedUp?: boolean) => Promise<{ success: boolean; message?: string }>;
   recordPayment: (orderId: string, paymentMode: PaymentMode) => Promise<void>;
 
 
@@ -1028,9 +1028,9 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      updateKgWeight: async (orderId, items) => {
+      updateKgWeight: async (orderId, items, markPickedUp = false) => {
         try {
-          const res = await api.patch(`/orders/${orderId}/kg-weight`, { items });
+          const res = await api.patch(`/orders/${orderId}/kg-weight`, { items, markPickedUp });
           if (res.data) {
             set(state => ({
               orders: state.orders.map(o => o._id === orderId ? res.data : o),
