@@ -698,7 +698,9 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                           </Text>
                         )}
                         {isKg ? (
-                          <Text style={[styles.cartItemRate, { color: '#0284C7', fontWeight: '800' }]}>Weighed at delivery</Text>
+                          <Text style={[styles.cartItemRate, { color: '#0284C7', fontWeight: '800' }]}>
+                            {item.pricePerKg ? `₹${item.pricePerKg}/kg · Weighed at delivery` : 'Weighed at delivery'}
+                          </Text>
                         ) : (
                           <Text style={styles.cartItemRate}>₹{item.price} per unit</Text>
                         )}

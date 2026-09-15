@@ -122,6 +122,7 @@ export interface CartItem {
   quantity: number;
   unit: 'KG' | 'ITEM';
   price: number;
+  pricePerKg?: number;
   image?: string;
   categoryName?: string;
   subCategoryName?: string;
