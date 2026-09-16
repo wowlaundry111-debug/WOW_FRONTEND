@@ -277,6 +277,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onRegist
                   value={otp}
                   onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
                   keyboardType="number-pad"
+                  textContentType="oneTimeCode"
                   maxLength={6}
                   autoFocus
                 />

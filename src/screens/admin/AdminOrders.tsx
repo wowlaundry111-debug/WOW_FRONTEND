@@ -53,12 +53,12 @@ const FILTERS: {
   label: string;
   statuses: OrderStatus[];
 }[] = [
-  { key: 'new', label: 'New Orders', statuses: ['PLACED', 'ACCEPTED'] },
+  { key: 'new', label: 'New Orders', statuses: ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED'] },
   { key: 'washing', label: 'In Wash Cycle', statuses: ['PICKED_UP', 'WASHING', 'IRONING'] },
   {
     key: 'delivery',
     label: 'Out for Delivery',
-    statuses: ['PICKUP_ASSIGNED', 'OUT_FOR_DELIVERY'],
+    statuses: ['OUT_FOR_DELIVERY'],
   },
   { key: 'history', label: 'History', statuses: ['DELIVERED'] },
 ];
@@ -470,6 +470,27 @@ export const AdminOrdersScreen: React.FC = () => {
                   </TouchableOpacity>
                 )}
 
+                {order.status === 'PICKUP_ASSIGNED' && (
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]}
+                      onPress={() => handleStatusChange(order._id, 'PICKED_UP')}
+                    >
+                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                        MARK PICKED UP
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
+                      onPress={() => setAssignModalOrder(order)}
+                    >
+                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                        {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'REASSIGN'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {order.status === 'PICKED_UP' && (
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: '#FDE047' }]}
@@ -489,23 +510,43 @@ export const AdminOrdersScreen: React.FC = () => {
                 )}
 
                 {order.status === 'IRONING' && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.secondary }]}
-                    onPress={() => setAssignModalOrder(order)}
-                  >
-                    <Text style={styles.actionBtnText}>OUT FOR DELIVERY</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: COLORS.secondary, flex: 1 }]}
+                      onPress={() => handleStatusChange(order._id, 'OUT_FOR_DELIVERY')}
+                    >
+                      <Text style={styles.actionBtnText}>OUT FOR DELIVERY</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
+                      onPress={() => setAssignModalOrder(order)}
+                    >
+                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                        {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'ASSIGN STAFF'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
 
                 {order.status === 'OUT_FOR_DELIVERY' && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
-                    onPress={() => handleStatusChange(order._id, 'DELIVERED')}
-                  >
-                    <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
-                      MARK DELIVERED
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]}
+                      onPress={() => handleStatusChange(order._id, 'DELIVERED')}
+                    >
+                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                        MARK DELIVERED
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
+                      onPress={() => setAssignModalOrder(order)}
+                    >
+                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                        {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'REASSIGN'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
 
                 {order.status === 'DELIVERED' && (
