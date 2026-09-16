@@ -99,9 +99,18 @@ export const AdminOrdersScreen: React.FC = () => {
   }, [selectedOrder]);
 
   const activeShopId = currentTenantId || currentUser?.shopId || '';
-  const tenantOrders = activeShopId
+  const rawTenantOrders = activeShopId
     ? orders.filter((o) => o.shopId === activeShopId)
     : orders;
+
+  const tenantOrders = useMemo(() => {
+    const seen = new Set<string>();
+    return (rawTenantOrders || []).filter((o) => {
+      if (!o || !o._id || seen.has(o._id)) return false;
+      seen.add(o._id);
+      return true;
+    });
+  }, [rawTenantOrders]);
 
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'price_high' | 'price_low' | 'customer'>('newest');
 
