@@ -58,6 +58,7 @@ export const COLORS = {
   onSurfaceVariant:       '#575045',
   outline:                '#000000',
   outlineVariant:         '#EBE3D5',
+  gray:                   '#6B7280',
   surfaceVariant:         '#FAF7F2',
 
   inverseSurface:         '#000000',

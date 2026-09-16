@@ -74,23 +74,11 @@ export const AuthScreen = () => {
 
     if (!res.success) {
       const msg = res.message || '';
-      if (msg.toLowerCase().includes('register first') || msg.toLowerCase().includes('no account found')) {
+      if (res.notRegistered || msg.toLowerCase().includes('register') || msg.toLowerCase().includes('not found')) {
         const emailToPass = identifier.trim();
         setRegisterEmail(emailToPass);
-        if (Platform.OS === 'web') {
-          if (typeof window !== 'undefined' && window.confirm(`No account found for "${emailToPass}".\n\nWould you like to open the Registration screen now?`)) {
-            setScreen('REGISTER');
-          }
-        } else {
-          Alert.alert(
-            'Account Not Found',
-            `No account found for "${emailToPass}". Would you like to register a new account?`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Register Now', onPress: () => setScreen('REGISTER') },
-            ]
-          );
-        }
+        setScreen('REGISTER');
+        return;
       } else {
         if (Platform.OS === 'web') {
           alert(msg);
