@@ -2,13 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   RefreshControl, Linking, Modal, ActivityIndicator, Dimensions,
-  Animated, Easing,
+  Animated, Easing, Alert,
 } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
-import { MapPin, Phone, QrCode, Banknote, Wifi, X, Smartphone, AlertTriangle, Truck, PackageCheck, Navigation, Clock, ShieldCheck, CheckCircle2, User, ChevronRight, Scale } from 'lucide-react-native';
+import { MapPin, Phone, QrCode, Banknote, Wifi, X, Smartphone, AlertTriangle, Truck, PackageCheck, Navigation, Clock, ShieldCheck, CheckCircle2, User, ChevronRight, Scale, MessageCircle } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
@@ -602,6 +602,67 @@ export const DeliveryTasksScreen = () => {
     await recordPayment(orderId, mode);
   };
 
+  const getCleanCustomerPhone = (order: Order): string => {
+    const raw = order.customerPhone || (order as any).customer?.phone || (order as any).phone || '';
+    if (!raw || raw === 'N/A' || raw === 'null' || raw === 'undefined') return '';
+    return raw.trim();
+  };
+
+  const handleCallCustomer = async (order: Order) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const rawPhone = getCleanCustomerPhone(order);
+    if (!rawPhone) {
+      Alert.alert(
+        'Phone Unavailable',
+        `No contact phone number is available for ${order.customerName || 'this customer'} (Order #${order._id.slice(-6).toUpperCase()}).`
+      );
+      return;
+    }
+
+    // Strip spaces, dashes, parentheses — retain leading + if present
+    const sanitized = rawPhone.replace(/[^\d+]/g, '');
+    if (!sanitized || sanitized.replace(/\D/g, '').length < 5) {
+      Alert.alert('Invalid Number', `The phone number "${rawPhone}" is not valid for dialing.`);
+      return;
+    }
+
+    const telUrl = `tel:${sanitized}`;
+    try {
+      const supported = await Linking.canOpenURL(telUrl);
+      if (supported) {
+        await Linking.openURL(telUrl);
+      } else {
+        await Linking.openURL(telUrl);
+      }
+    } catch (err: any) {
+      Alert.alert(
+        'Customer Phone',
+        `Customer: ${order.customerName || 'Customer'}\nPhone: ${rawPhone}\n\nUnable to open dialer automatically on this device.`,
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleWhatsAppCustomer = async (order: Order) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const rawPhone = getCleanCustomerPhone(order);
+    if (!rawPhone) {
+      Alert.alert('WhatsApp Unavailable', `No phone number is available for ${order.customerName || 'this customer'}.`);
+      return;
+    }
+    const digitsOnly = rawPhone.replace(/\D/g, '');
+    const phoneWithCountry = digitsOnly.length === 10 ? `91${digitsOnly}` : digitsOnly;
+    const orderRef = order._id.slice(-6).toUpperCase();
+    const message = encodeURIComponent(`Hi ${order.customerName || 'Customer'}, I am your delivery agent for WOW Laundry Order #${orderRef}.`);
+    const waUrl = `https://wa.me/${phoneWithCountry}?text=${message}`;
+
+    try {
+      await Linking.openURL(waUrl);
+    } catch (err) {
+      Alert.alert('WhatsApp Error', 'Could not open WhatsApp on this device.');
+    }
+  };
+
   return (
     <View style={styles.root}>
       {/* Top overscroll filler for iOS pull-down */}
@@ -770,7 +831,8 @@ export const DeliveryTasksScreen = () => {
           </>
         ) : (
           displayedOrders.map((order, orderIdx) => {
-          return (
+            const resolvedPhone = getCleanCustomerPhone(order);
+            return (
             <View key={`${order._id}-${orderIdx}`} style={styles.taskCard}>
               <View style={styles.taskCardHeader}>
                 <View style={styles.orderIdBadge}>
@@ -781,7 +843,19 @@ export const DeliveryTasksScreen = () => {
                 </View>
               </View>
 
-              <Text style={styles.customerName}>{order.customerName || 'Customer'}</Text>
+              <View style={styles.customerHeaderRow}>
+                <Text style={styles.customerName}>{order.customerName || 'Customer'}</Text>
+                {resolvedPhone ? (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => handleCallCustomer(order)}
+                    style={styles.phoneChip}
+                  >
+                    <Phone size={11} color="#0284C7" strokeWidth={2.5} />
+                    <Text style={styles.phoneChipText}>{resolvedPhone}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
 
               {/* Items Breakdown */}
               {order.items && order.items.length > 0 && (
@@ -864,17 +938,22 @@ export const DeliveryTasksScreen = () => {
 
               {/* Action Buttons */}
               <View style={styles.actionRow}>
-                {order.customerPhone ? (
+                <TouchableOpacity
+                  style={[styles.callBtn, !resolvedPhone && styles.callBtnDisabled]}
+                  activeOpacity={0.8}
+                  onPress={() => handleCallCustomer(order)}
+                >
+                  <Phone size={15} color={COLORS.black} strokeWidth={2.5} />
+                  <Text style={styles.callBtnText}>CALL</Text>
+                </TouchableOpacity>
+
+                {resolvedPhone ? (
                   <TouchableOpacity
-                    style={styles.callBtn}
+                    style={styles.waBtn}
                     activeOpacity={0.8}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      Linking.openURL(`tel:${order.customerPhone}`);
-                    }}
+                    onPress={() => handleWhatsAppCustomer(order)}
                   >
-                    <Phone size={15} color={COLORS.black} strokeWidth={2.5} />
-                    <Text style={styles.callBtnText}>CALL</Text>
+                    <MessageCircle size={15} color={COLORS.white} strokeWidth={2.5} />
                   </TouchableOpacity>
                 ) : null}
 
@@ -1277,6 +1356,43 @@ const styles = StyleSheet.create({
     borderColor: COLORS.black,
     borderRadius: RADIUS.md,
     paddingHorizontal: 14,
+    paddingVertical: 10,
+    ...NEO_SHADOW.box2,
+  },
+  customerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  phoneChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#38BDF8',
+  },
+  phoneChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0284C7',
+    fontFamily: 'Outfit_800ExtraBold',
+  },
+  callBtnDisabled: {
+    opacity: 0.5,
+  },
+  waBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22C55E',
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     ...NEO_SHADOW.box2,
   },
