@@ -42,6 +42,7 @@ export const AdminCatalogScreen: React.FC = () => {
   const [editingCat, setEditingCat] = useState<any | null>(null);
   const [editCatName, setEditCatName] = useState('');
   const [editCatImage, setEditCatImage] = useState('');
+  const [editCatSingleItem, setEditCatSingleItem] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const activeShopId = currentTenantId || currentUser?.shopId || '';
@@ -99,6 +100,7 @@ export const AdminCatalogScreen: React.FC = () => {
     setEditingCat(cat);
     setEditCatName(cat.name || '');
     setEditCatImage(cat.image || '');
+    setEditCatSingleItem(!!cat.singleItemSelection);
   };
 
   const handleSaveCatEdit = async () => {
@@ -111,6 +113,7 @@ export const AdminCatalogScreen: React.FC = () => {
       await updateCategory(editingCat._id, {
         name: editCatName.trim(),
         image: editCatImage || undefined,
+        singleItemSelection: editingCat.parentCategoryId ? editCatSingleItem : undefined,
       });
       setEditingCat(null);
     } catch (e: any) {
@@ -517,6 +520,16 @@ export const AdminCatalogScreen: React.FC = () => {
                 onChangeText={setEditCatName}
               />
             </View>
+
+            {editingCat?.parentCategoryId && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: '#FEF9C3', borderWidth: 2, borderColor: COLORS.black, marginBottom: 16, borderRadius: 8 }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: COLORS.black, textTransform: 'uppercase' }}>1-Click Direct Selection</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#854D0E', marginTop: 4 }}>When turned ON, customers pick an item with just 1 click directly into their cart without selecting multiple items.</Text>
+                </View>
+                <ToggleSwitch value={editCatSingleItem} onToggle={() => setEditCatSingleItem(!editCatSingleItem)} />
+              </View>
+            )}
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>CATEGORY ICON / ILLUSTRATION</Text>

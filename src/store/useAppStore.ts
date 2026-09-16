@@ -628,6 +628,52 @@ export const useAppStore = create<AppState>()(
         const resolvedPrice = isKg ? 0 : (item.pricePerItem ?? item.price ?? 0);
         const resolvedUnit = isKg ? 'KG' : 'ITEM';
 
+        const { categories } = get();
+        const cat = categories.find(c => c._id === item.categoryId);
+        const isSingleMode = Boolean(cat?.singleItemSelection);
+
+        if (isSingleMode) {
+          if (quantity <= 0) {
+            set({ cart: cart.filter(c => c.itemId !== item._id) });
+            return;
+          }
+
+          // In 1-Click Single Item Mode:
+          // Remove any other item from this sub-category so the new item cleanly replaces it in 1 click
+          const cleanedCart = cart.filter(c => {
+            const otherItem = get().items.find(i => String(i._id) === String(c.itemId));
+            return !(otherItem && String(otherItem.categoryId) === String(item.categoryId));
+          });
+
+          let categoryName = '';
+          let subCategoryName = '';
+          if (cat) {
+            if (cat.parentCategoryId) {
+              const parentCat = categories.find(c => c._id === cat.parentCategoryId);
+              categoryName = parentCat?.name || '';
+              subCategoryName = cat.name;
+            } else {
+              categoryName = cat.name;
+            }
+          }
+
+          set({
+            cart: [...cleanedCart, {
+              itemId: item._id,
+              name: item.name,
+              quantity: 1, // Single item mode always adds 1 qty in 1-click
+              price: resolvedPrice,
+              pricePerKg: ratePerKg,
+              unit: resolvedUnit,
+              image: item.image,
+              categoryName,
+              subCategoryName,
+              isBucket: !!item.isBucket,
+            }]
+          });
+          return;
+        }
+
         if (existingIndex >= 0) {
           const newCart = [...cart];
           newCart[existingIndex].quantity += quantity;
@@ -637,18 +683,6 @@ export const useAppStore = create<AppState>()(
             set({ cart: newCart });
           }
         } else if (quantity > 0) {
-          const { categories } = get();
-          const cat = categories.find(c => c._id === item.categoryId);
-
-          if (cat?.singleItemSelection) {
-            const hasOtherFromSubcat = cart.some(c => {
-              const otherItem = get().items.find(i => i._id === c.itemId);
-              return otherItem && String(otherItem.categoryId) === String(item.categoryId) && c.itemId !== item._id;
-            });
-            if (hasOtherFromSubcat) {
-              return; // Prevent adding if single item selection rule is violated
-            }
-          }
           let categoryName = '';
           let subCategoryName = '';
           if (cat) {

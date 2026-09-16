@@ -253,12 +253,60 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
                 />
 
                 {category.parentCategoryId && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: '#fff', borderWidth: 2, borderColor: COLORS.black, marginTop: 12, borderRadius: 8 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '900', color: COLORS.black, textTransform: 'uppercase' }}>Single Item Only</Text>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: COLORS.gray, marginTop: 4 }}>Restrict customers to adding only one item type from this sub-category</Text>
+                  <View style={{ padding: 12, backgroundColor: '#FEF9C3', borderWidth: 2, borderColor: COLORS.black, marginTop: 12, borderRadius: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '900', color: COLORS.black, textTransform: 'uppercase' }}>1-Click Direct Selection</Text>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#854D0E', marginTop: 4 }}>
+                          When turned ON, customers pick an item with just 1 click directly into their cart without selecting multiple items.
+                        </Text>
+                      </View>
+                      <ToggleSwitch value={editCatSingleItem} onToggle={() => setEditCatSingleItem(!editCatSingleItem)} />
                     </View>
-                    <ToggleSwitch value={editCatSingleItem} onToggle={() => setEditCatSingleItem(!editCatSingleItem)} />
+                  </View>
+                )}
+
+                {/* Subcategory Add Item Buttons Inside Edit Part */}
+                {category.parentCategoryId && (
+                  <View style={{ marginTop: 12, padding: 12, backgroundColor: '#F0FDF4', borderWidth: 2, borderColor: COLORS.black, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: COLORS.black, textTransform: 'uppercase', marginBottom: 2 }}>Sub-Category Items</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#166534', marginBottom: 8 }}>
+                      {catItems.length} service item(s) configured in this sub-category
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: COLORS.secondary, paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1.5, borderColor: COLORS.black, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}
+                        onPress={() => {
+                          setIsEditingCategory(false);
+                          setEditingItemId(null);
+                          setNewItemName('');
+                          setNewItemDesc('');
+                          setNewItemPrice('');
+                          setNewItemUnit('ITEM');
+                          setNewItemIsBucket(false);
+                          setNewItemImage('');
+                          setIsAdding(true);
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '900', color: COLORS.black, textTransform: 'uppercase' }}>+ Regular Item</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#F97316', paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1.5, borderColor: COLORS.black, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}
+                        onPress={() => {
+                          setIsEditingCategory(false);
+                          setEditingItemId(null);
+                          setNewItemName(`${category.name} Bucket (Per KG)`);
+                          setNewItemDesc('Drop your clothes in a bucket. Weighed and priced upon delivery.');
+                          setNewItemPrice('');
+                          setNewItemUnit('KG');
+                          setNewItemIsBucket(true);
+                          setNewItemImage('');
+                          setIsAdding(true);
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '900', color: COLORS.white, textTransform: 'uppercase' }}>+ Bucket Service</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 )}
 
@@ -301,7 +349,7 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
               </View>
             )}
 
-            {/* Add Service Section / Button — strictly allowed in sub-categories only */}
+            {/* If parent category, notify items belong to sub-categories */}
             {!category.parentCategoryId ? (
               <View style={{ marginVertical: 12, padding: 14, backgroundColor: '#FEF3C7', borderColor: '#D97706', borderWidth: 2, borderRadius: 14 }}>
                 <Text style={{ fontSize: 12, fontWeight: '900', color: '#92400E', textTransform: 'uppercase' }}>
@@ -311,47 +359,7 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
                   Individual service items must belong to a sub-category. Please open a sub-category to create and manage items.
                 </Text>
               </View>
-            ) : !isAdding ? (
-              <View style={{ gap: 10, marginBottom: SPACING.lg }}>
-                <TouchableOpacity
-                  style={[styles.addServiceCTA, { backgroundColor: '#F97316' }]}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    setEditingItemId(null);
-                    setNewItemName(`${category.name} Bucket (Per KG)`);
-                    setNewItemDesc('Drop your clothes in a bucket. Weighed and priced upon delivery.');
-                    setNewItemPrice('');
-                    setNewItemUnit('KG');
-                    setNewItemIsBucket(true);
-                    setNewItemImage('');
-                    setIsAdding(true);
-                  }}
-                >
-                  <Sparkles size={18} color={COLORS.white} strokeWidth={3} />
-                  <Text style={[styles.addServiceCTAText, { color: COLORS.white }]}>
-                    + ADD BUCKET SERVICE (PER KG)
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.addServiceCTA}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    setEditingItemId(null);
-                    setNewItemName('');
-                    setNewItemDesc('');
-                    setNewItemPrice('');
-                    setNewItemUnit('ITEM');
-                    setNewItemIsBucket(false);
-                    setNewItemImage('');
-                    setIsAdding(true);
-                  }}
-                >
-                  <Plus size={20} color={COLORS.black} strokeWidth={3} />
-                  <Text style={styles.addServiceCTAText}>+ ADD REGULAR SERVICE ITEM</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
+            ) : isAdding ? (
               <View style={styles.addFormBox}>
                 <Text style={styles.formHeading}>
                   {editingItemId ? 'EDIT SERVICE' : 'NEW SERVICE'}
@@ -496,7 +504,7 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
                   </TouchableOpacity>
                 </View>
               </View>
-            )}
+            ) : null}
 
             {/* List of services in this category */}
             <Text style={styles.servicesSectionTitle}>SERVICES ({catItems.length})</Text>

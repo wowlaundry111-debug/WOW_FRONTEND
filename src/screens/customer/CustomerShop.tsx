@@ -636,10 +636,9 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
               const ratePerKg = item.pricePerKg || (item.unit === 'KG' ? (item.pricePerItem ?? item.price) : (item.price ?? item.pricePerItem)) || 0;
 
               const itemCat = categories.find(c => String(c._id) === String(item.categoryId));
-              const isDisabled = itemCat?.singleItemSelection && cart.some(c => {
-                const otherItem = items.find(i => String(i._id) === String(c.itemId));
-                return otherItem && String(otherItem.categoryId) === String(item.categoryId) && String(c.itemId) !== String(item._id);
-              });
+              const isSingleMode = Boolean(itemCat?.singleItemSelection);
+              const isSelected = cart.some(c => String(c.itemId) === String(item._id));
+              const isDisabled = false;
 
               // ── BUCKET ITEM: Large tappable card to increase clothes count ──
               if (isBucket) {
@@ -647,9 +646,14 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
                   <TouchableOpacity
                     key={item._id}
                     activeOpacity={0.88}
-                    disabled={isDisabled}
-                    onPress={() => handleAddToCart(item, 1)}
-                    style={[styles.bucketCard, isDisabled && { opacity: 0.5 }]}
+                    onPress={() => {
+                      if (isSingleMode) {
+                        if (!isSelected) handleAddToCart(item, 1);
+                      } else {
+                        handleAddToCart(item, 1);
+                      }
+                    }}
+                    style={[styles.bucketCard, isSingleMode && isSelected && { borderColor: COLORS.secondary, borderWidth: 3, backgroundColor: '#F7FEE7' }]}
                   >
                     <View style={styles.bucketCardInner}>
                       <View style={styles.bucketImgWrap}>
@@ -708,16 +712,30 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
                             </TouchableOpacity>
                           )}
 
-                          <TouchableOpacity
-                            disabled={isDisabled}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              handleAddToCart(item, 1);
-                            }}
-                            style={[styles.bucketAddBtn, isDisabled && { backgroundColor: '#9CA3AF' }]}
-                          >
-                            <Text style={styles.bucketAddBtnText}>{isDisabled ? 'DISABLED' : `+ ADD (${qty})`}</Text>
-                          </TouchableOpacity>
+                          {isSingleMode ? (
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                if (isSelected) handleAddToCart(item, -1);
+                                else handleAddToCart(item, 1);
+                              }}
+                              style={[styles.bucketAddBtn, isSelected && { backgroundColor: COLORS.secondary }]}
+                            >
+                              <Text style={[styles.bucketAddBtnText, isSelected && { color: COLORS.black }]}>
+                                {isSelected ? '✓ IN CART' : '1-CLICK ADD'}
+                              </Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(item, 1);
+                              }}
+                              style={styles.bucketAddBtn}
+                            >
+                              <Text style={styles.bucketAddBtnText}>{`+ ADD (${qty})`}</Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       </View>
                     </View>
@@ -775,7 +793,25 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
 
                   {/* Stepper / ADD CTA */}
                   <View style={styles.actionWrap}>
-                    {qty > 0 ? (
+                    {isSingleMode ? (
+                      isSelected ? (
+                        <TouchableOpacity
+                          onPress={() => handleAddToCart(item, -1)}
+                          style={[styles.addBtn, { backgroundColor: COLORS.secondary, borderColor: COLORS.black, paddingHorizontal: 10 }]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.addBtnText, { color: COLORS.black, fontSize: 11 }]}>✓ SELECTED</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleAddToCart(item, 1)}
+                          style={[styles.addBtn, { backgroundColor: COLORS.black, borderColor: COLORS.black, paddingHorizontal: 12 }]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.addBtnText, { color: COLORS.secondary, fontSize: 11 }]}>1-CLICK ADD</Text>
+                        </TouchableOpacity>
+                      )
+                    ) : qty > 0 ? (
                       <View style={styles.stepperWrap}>
                         <TouchableOpacity
                           style={styles.stepperBtn}
@@ -795,10 +831,10 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
                       </View>
                     ) : (
                       <BouncyCard
-                        onPress={() => { if (!isDisabled) handleAddToCart(item, 1); }}
-                        contentStyle={[styles.addBtn, isDisabled && { backgroundColor: '#9CA3AF', borderColor: '#4B5563' }]}
+                        onPress={() => handleAddToCart(item, 1)}
+                        contentStyle={styles.addBtn}
                       >
-                        <Text style={[styles.addBtnText, isDisabled && { color: '#fff' }]}>{isDisabled ? 'DISABLED' : 'ADD +'}</Text>
+                        <Text style={styles.addBtnText}>ADD +</Text>
                       </BouncyCard>
                     )}
                   </View>
