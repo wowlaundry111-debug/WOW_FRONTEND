@@ -46,7 +46,7 @@ interface AppState {
   autoSelectUserForRole: (role: Role, shopId?: string) => Promise<void>;
 
   // Async Data Fetching
-  initializeAppData: () => Promise<void>;
+  initializeAppData: (force?: boolean) => Promise<void>;
   login: (identifier: string, password?: string) => Promise<{ success: boolean; message: string }>;
   sendLoginOtp: (identifier: string, password?: string) => Promise<{ success: boolean; requiresOtp?: boolean; notRegistered?: boolean; message: string }>;
   verifyLoginOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
@@ -224,14 +224,14 @@ export const useAppStore = create<AppState>()(
       },
 
       // App initialization — shops + catalog + orders + users for active role
-      initializeAppData: async () => {
+      initializeAppData: async (force = false) => {
         const GLOBAL_TTL = 5 * 60_000; // 5 minutes
         const now = Date.now();
         const { shopsLastFetched, offersLastFetched, shops } = get();
 
         // Skip re-fetch if shops/offers data is still fresh and we already have data
-        const isShopsFresh = shops.length > 0 && (now - shopsLastFetched) < GLOBAL_TTL;
-        const isOffersFresh = (now - offersLastFetched) < GLOBAL_TTL;
+        const isShopsFresh = !force && shops.length > 0 && (now - shopsLastFetched) < GLOBAL_TTL;
+        const isOffersFresh = !force && (now - offersLastFetched) < GLOBAL_TTL;
         const isSuper = get().currentUser?.role === 'SuperAdmin';
 
         if (isShopsFresh && isOffersFresh) {
@@ -779,7 +779,7 @@ export const useAppStore = create<AppState>()(
         try {
           const shop = get().shops.find(s => s._id === currentTenantId);
           const taxPercent = shop?.taxPercent || 0;
-          const deliveryFeeAmt = shop?.deliveryFee || 0;
+          const deliveryFeeAmt = (shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0;
           const tax = (perItemSubtotal * taxPercent) / 100;
           const washPrefsCost = washPreferences?.reduce((s, w) => s + w.price, 0) || 0;
           const finalTotal = perItemSubtotal - discount + tax + deliveryFeeAmt + washPrefsCost;
@@ -1205,6 +1205,7 @@ export const useAppStore = create<AppState>()(
           // Surgical update
           set(state => ({
             shops: state.shops.map(s => s._id === shopId ? res.data : s),
+            shopsLastFetched: Date.now(),
           }));
         } catch (err: any) {
           console.error('Failed to update shop:', err);

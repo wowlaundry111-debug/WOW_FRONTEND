@@ -219,10 +219,15 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
     activeCoupon,
     applyCoupon,
     removeCoupon,
+    initializeAppData,
   } = useAppStore();
 
   const shop = shops.find((s) => s._id === currentTenantId);
   const isClosed = shop?.isOpen === false;
+
+  useEffect(() => {
+    initializeAppData(true);
+  }, [initializeAppData]);
 
   const [selectedPrefs, setSelectedPrefs] = useState<string[]>([]);
   
@@ -244,8 +249,9 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   const hasKgItems = cart.some(isKgItem);
   const perItemSubtotal = cart.filter(c => !isKgItem(c)).reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
   const subtotal = perItemSubtotal;
-  const taxPercent = shop?.taxPercent || 5;
-  const deliveryFee = hasKgItems ? (shop?.deliveryFee || 50) : (subtotal > 500 ? 0 : (shop?.deliveryFee || 50));
+  const taxPercent = shop?.taxPercent !== undefined ? Number(shop.taxPercent) : 5;
+  const shopDeliveryFee = (shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0;
+  const deliveryFee = hasKgItems ? shopDeliveryFee : (subtotal > 500 ? 0 : shopDeliveryFee);
   const tax = (subtotal * taxPercent) / 100;
   const discount = activeCoupon
     ? Math.min((subtotal * activeCoupon.discountPercent) / 100, activeCoupon.maxDiscount)
