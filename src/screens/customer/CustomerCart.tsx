@@ -256,7 +256,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   const discount = activeCoupon
     ? Math.min((subtotal * activeCoupon.discountPercent) / 100, activeCoupon.maxDiscount)
     : 0;
-  const total = subtotal + tax + deliveryFee + washPrefsCost - discount;
+  const total = Math.max(0, subtotal + tax + deliveryFee + washPrefsCost - discount);
 
 
   // Structured Precise Delivery Address
@@ -871,10 +871,12 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
               <Text style={styles.billLabel}>Taxes & Fees</Text>
               <Text style={styles.billVal}>₹{tax.toFixed(0)}</Text>
             </View>
-            {discount > 0 && (
-              <View style={styles.billRow}>
-                <Text style={[styles.billLabel, { color: '#16A34A' }]}>Discount</Text>
-                <Text style={[styles.billVal, { color: '#16A34A' }]}>-₹{discount.toFixed(0)}</Text>
+            {activeCoupon && (
+              <View style={[styles.billRow, { backgroundColor: '#DCFCE7', padding: 6, borderRadius: 6 }]}>
+                <Text style={[styles.billLabel, { color: '#16A34A', fontWeight: '800' }]}>Promo ({activeCoupon.code})</Text>
+                <Text style={[styles.billVal, { color: '#16A34A', fontWeight: '800' }]}>
+                  {discount > 0 ? `-₹${discount.toFixed(0)}` : `${activeCoupon.discountPercent}% OFF (At weighing)`}
+                </Text>
               </View>
             )}
 

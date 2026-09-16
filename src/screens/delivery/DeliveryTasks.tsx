@@ -384,12 +384,48 @@ const WeighKgModal = ({
             })}
           </ScrollView>
 
-          <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderRadius: 8, marginTop: 12, borderWidth: 1, borderColor: '#BBF7D0' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#166534' }}>Estimated KG Total:</Text>
-              <Text style={{ fontSize: 16, fontWeight: '900', color: '#166534' }}>₹{calculateLiveTotal().toFixed(0)}</Text>
-            </View>
-          </View>
+          {(() => {
+            const kgTotal = calculateLiveTotal();
+            const perItemSubtotal = order.items
+              .filter(it => !isKgCheck(it))
+              .reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+            const itemSubtotal = kgTotal + perItemSubtotal;
+
+            let liveDiscount = Number(order.discountAmount) || 0;
+            if (order.couponCode) {
+              const discountPercent = Number(order.couponDiscountPercent) || 0;
+              const maxDiscount = order.couponMaxDiscount !== undefined ? Number(order.couponMaxDiscount) : Infinity;
+              const minOrder = Number(order.couponMinOrderValue) || 0;
+
+              if (discountPercent > 0) {
+                if (itemSubtotal >= minOrder) {
+                  liveDiscount = Math.min((itemSubtotal * discountPercent) / 100, maxDiscount);
+                  liveDiscount = Math.round(liveDiscount * 100) / 100;
+                } else {
+                  liveDiscount = 0;
+                }
+              }
+            }
+
+            return (
+              <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderRadius: 8, marginTop: 12, borderWidth: 1, borderColor: '#BBF7D0', gap: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#166534' }}>Estimated KG Total:</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#166534' }}>₹{kgTotal.toFixed(0)}</Text>
+                </View>
+                {(liveDiscount > 0 || order.couponCode) ? (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>
+                      Promo ({order.couponCode || 'Coupon'}):
+                    </Text>
+                    <Text style={{ fontSize: 12, fontWeight: '900', color: '#15803D' }}>
+                      {liveDiscount > 0 ? `-₹${liveDiscount.toFixed(0)}` : 'Applied upon weighing'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })()}
 
           <View style={styles.modalActionRow}>
             <TouchableOpacity style={styles.modalCancelBtn} onPress={onClose} disabled={submitting}>
@@ -1050,11 +1086,6 @@ export const DeliveryTasksScreen = () => {
           onClose={() => setWeighModalOrder(null)}
           onConfirm={async (weights, markPickedUp = true) => {
             await updateKgWeight(weighModalOrder._id, weights, markPickedUp);
-            if (markPickedUp) {
-              const initial: Record<string, number> = {};
-              weighModalOrder.items.forEach(it => initial[it.itemId] = it.quantity);
-              await verifyOrderItems(weighModalOrder._id, initial);
-            }
           }}
         />
       )}

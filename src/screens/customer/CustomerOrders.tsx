@@ -483,6 +483,13 @@ export const CustomerOrdersScreen = () => {
                                   <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>KG CALCULATED</Text>
                                 </View>
                               ) : null}
+                              {order.discountAmount && order.discountAmount > 0 ? (
+                                <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#16A34A' }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '900', color: '#166534' }}>
+                                    SAVED ₹{order.discountAmount}{order.couponCode ? ` (${order.couponCode})` : ''}
+                                  </Text>
+                                </View>
+                              ) : null}
                             </View>
                           );
                         })()}

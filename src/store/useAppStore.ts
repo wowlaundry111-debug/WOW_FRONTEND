@@ -769,12 +769,25 @@ export const useAppStore = create<AppState>()(
           c.unit === 'KG' || 
           (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg'))) || 
           Boolean(c.pricePerKg && c.pricePerKg > 0);
-        const subtotal = cart.filter(c => !isKgItemCheck(c)).reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
-        if (subtotal < coupon.minOrderValue) {
+
+        const hasKgItems = cart.some(isKgItemCheck);
+        const perItemSubtotal = cart.filter(c => !isKgItemCheck(c)).reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
+        const estKgSubtotal = cart.filter(isKgItemCheck).reduce((sum, c) => sum + (Number(c.pricePerKg || 0) * Number(c.quantity || 1)), 0);
+        const effectiveSubtotal = hasKgItems ? (perItemSubtotal + estKgSubtotal) : perItemSubtotal;
+
+        if (!hasKgItems && perItemSubtotal < coupon.minOrderValue) {
           return { success: false, message: `Minimum order value for this coupon is ₹${coupon.minOrderValue}` };
         }
+        if (hasKgItems && coupon.minOrderValue > 0 && effectiveSubtotal < coupon.minOrderValue) {
+          return { success: false, message: `Estimated order value must be at least ₹${coupon.minOrderValue} for this coupon` };
+        }
+
         set({ activeCoupon: coupon });
-        return { success: true, message: `Coupon applied: ₹${Math.min((subtotal * coupon.discountPercent) / 100, coupon.maxDiscount)} off!` };
+        if (hasKgItems && perItemSubtotal === 0) {
+          return { success: true, message: `Coupon ${coupon.code} applied! ${coupon.discountPercent}% OFF will be deducted upon pickup weighing.` };
+        }
+        const discountVal = Math.min((perItemSubtotal * coupon.discountPercent) / 100, coupon.maxDiscount);
+        return { success: true, message: `Coupon applied: ₹${discountVal} off!${hasKgItems ? ' (Additional KG discount applied at weighing)' : ''}` };
       },
 
       removeCoupon: () => set({ activeCoupon: null }),
@@ -821,7 +834,7 @@ export const useAppStore = create<AppState>()(
           const deliveryFeeAmt = (shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0;
           const tax = (perItemSubtotal * taxPercent) / 100;
           const washPrefsCost = washPreferences?.reduce((s, w) => s + w.price, 0) || 0;
-          const finalTotal = perItemSubtotal - discount + tax + deliveryFeeAmt + washPrefsCost;
+          const finalTotal = Math.max(0, perItemSubtotal - discount + tax + deliveryFeeAmt + washPrefsCost);
 
           const res = await api.post('/orders', {
             shopId: currentTenantId,
@@ -830,6 +843,9 @@ export const useAppStore = create<AppState>()(
             totalAmount: finalTotal,
             discountAmount: discount,
             couponCode: activeCoupon?.code || undefined,
+            couponDiscountPercent: activeCoupon?.discountPercent || undefined,
+            couponMaxDiscount: activeCoupon?.maxDiscount !== undefined ? activeCoupon.maxDiscount : undefined,
+            couponMinOrderValue: activeCoupon?.minOrderValue || 0,
             taxAmount: tax,
             deliveryFee: deliveryFeeAmt,
             pickupAddress: deliveryAddress,
