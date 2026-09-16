@@ -629,8 +629,9 @@ export const useAppStore = create<AppState>()(
         const resolvedUnit = isKg ? 'KG' : 'ITEM';
 
         const { categories } = get();
-        const cat = categories.find(c => c._id === item.categoryId);
-        const isSingleMode = Boolean(cat?.singleItemSelection);
+        const cat = categories.find(c => String(c._id) === String(item.categoryId));
+        const parentCat = cat?.parentCategoryId ? categories.find(c => String(c._id) === String(cat.parentCategoryId)) : null;
+        const isSingleMode = Boolean(cat?.singleItemSelection || parentCat?.singleItemSelection);
 
         if (isSingleMode) {
           if (quantity <= 0) {
@@ -639,10 +640,14 @@ export const useAppStore = create<AppState>()(
           }
 
           // In 1-Click Single Item Mode:
-          // Remove any other item from this sub-category so the new item cleanly replaces it in 1 click
+          // Remove any other item from this category/sub-category so the new item cleanly replaces it in 1 click
           const cleanedCart = cart.filter(c => {
             const otherItem = get().items.find(i => String(i._id) === String(c.itemId));
-            return !(otherItem && String(otherItem.categoryId) === String(item.categoryId));
+            if (!otherItem) return true;
+            const otherCat = categories.find(catItem => String(catItem._id) === String(otherItem.categoryId));
+            const isSameSubCat = String(otherItem.categoryId) === String(item.categoryId);
+            const isSameParentCat = parentCat && otherCat && String(otherCat.parentCategoryId) === String(parentCat._id);
+            return !(isSameSubCat || (parentCat?.singleItemSelection && isSameParentCat));
           });
 
           let categoryName = '';

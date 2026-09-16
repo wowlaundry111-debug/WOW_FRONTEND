@@ -798,7 +798,8 @@ export const CustomerHomeScreen: React.FC<CustomerHomeProps> = ({ onCategoryPres
                 {matchingItems.map((item) => {
                   const qty = getQuantity(item._id);
                   const itemCat = categories.find((c) => String(c._id) === String(item.categoryId));
-                  const isSingleMode = Boolean(itemCat?.singleItemSelection);
+                  const parentCat = itemCat?.parentCategoryId ? categories.find(c => String(c._id) === String(itemCat.parentCategoryId)) : null;
+                  const isSingleMode = Boolean(itemCat?.singleItemSelection || parentCat?.singleItemSelection);
                   const isSelected = cart.some(c => String(c.itemId) === String(item._id));
 
                   return (

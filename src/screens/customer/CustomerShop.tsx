@@ -636,7 +636,8 @@ export const CustomerShopScreen: React.FC<CustomerShopProps> = ({
               const ratePerKg = item.pricePerKg || (item.unit === 'KG' ? (item.pricePerItem ?? item.price) : (item.price ?? item.pricePerItem)) || 0;
 
               const itemCat = categories.find(c => String(c._id) === String(item.categoryId));
-              const isSingleMode = Boolean(itemCat?.singleItemSelection);
+              const parentCat = itemCat?.parentCategoryId ? categories.find(c => String(c._id) === String(itemCat.parentCategoryId)) : null;
+              const isSingleMode = Boolean(itemCat?.singleItemSelection || parentCat?.singleItemSelection);
               const isSelected = cart.some(c => String(c.itemId) === String(item._id));
               const isDisabled = false;
 

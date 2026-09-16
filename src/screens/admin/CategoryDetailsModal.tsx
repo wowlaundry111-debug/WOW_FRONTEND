@@ -159,7 +159,7 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
       else Alert.alert('Required', 'Category name cannot be empty');
       return;
     }
-    updateCategory(catId!, { name: editCatName.trim(), image: editCatImage || undefined, singleItemSelection: category.parentCategoryId ? editCatSingleItem : undefined });
+    updateCategory(catId!, { name: editCatName.trim(), image: editCatImage || undefined, singleItemSelection: Boolean(editCatSingleItem) });
     setIsEditingCategory(false);
   };
 

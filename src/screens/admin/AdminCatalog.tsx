@@ -113,7 +113,7 @@ export const AdminCatalogScreen: React.FC = () => {
       await updateCategory(editingCat._id, {
         name: editCatName.trim(),
         image: editCatImage || undefined,
-        singleItemSelection: editingCat.parentCategoryId ? editCatSingleItem : undefined,
+        singleItemSelection: Boolean(editCatSingleItem),
       });
       setEditingCat(null);
     } catch (e: any) {
