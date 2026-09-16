@@ -92,6 +92,8 @@ interface AppState {
   createShop: (name: string, branches: string[], upiId: string, bankName: string, accountNo: string, adminEmail: string) => Promise<void>;
   updateShop: (shopId: string, data: Partial<Shop>) => Promise<void>;
   deleteShop: (shopId: string) => Promise<void>;
+  fetchAdminShop: (shopId: string) => Promise<Shop | null>;
+  fetchAdminShops: () => Promise<Shop[]>;
   addDeliveryBoy: (email: string, targetShopId?: string, name?: string, phone?: string) => Promise<any>;
   updateUser: (userId: string, data: Partial<User>) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
@@ -273,6 +275,11 @@ export const useAppStore = create<AppState>()(
             promises.push(get().fetchOrders());
             if (['SuperAdmin', 'ShopAdmin'].includes(get().currentUser.role)) {
               promises.push(get().fetchUsers());
+              if (get().currentUser.role === 'SuperAdmin') {
+                promises.push(get().fetchAdminShops());
+              } else if (get().currentUser.shopId) {
+                promises.push(get().fetchAdminShop(get().currentUser.shopId));
+              }
             }
           }
           await Promise.all(promises);
@@ -1265,6 +1272,37 @@ export const useAppStore = create<AppState>()(
         } catch (err: any) {
           console.error('Failed to update shop:', err);
           throw err;
+        }
+      },
+
+      fetchAdminShop: async (shopId: string) => {
+        if (!shopId) return null;
+        try {
+          const res = await api.get(`/catalog/shops/${shopId}/admin`);
+          if (res.data) {
+            set(state => ({
+              shops: state.shops.map(s => s._id === shopId ? { ...s, ...res.data } : s),
+            }));
+            return res.data;
+          }
+          return null;
+        } catch (err) {
+          console.warn('Failed to fetch admin shop details:', err);
+          return null;
+        }
+      },
+
+      fetchAdminShops: async () => {
+        try {
+          const res = await api.get('/catalog/shops/admin/all');
+          if (Array.isArray(res.data)) {
+            set({ shops: res.data });
+            return res.data;
+          }
+          return [];
+        } catch (err) {
+          console.warn('Failed to fetch admin shops list:', err);
+          return [];
         }
       },
 
