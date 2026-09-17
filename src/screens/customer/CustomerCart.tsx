@@ -375,9 +375,13 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
     }
   };
 
-  const handleApplyCoupon = () => {
-    if (!couponCode.trim()) return;
-    const res = applyCoupon(couponCode.trim().toUpperCase());
+  const handleApplyCoupon = (overrideCode?: string) => {
+    const codeToApply = (overrideCode || couponCode || (shop?.promoCode?.isActive ? shop.promoCode.code : '')).trim().toUpperCase();
+    if (!codeToApply) {
+      setCouponMsg({ type: 'error', text: 'Please enter a promo code' });
+      return;
+    }
+    const res = applyCoupon(codeToApply);
     if (res.success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCouponMsg({ type: 'success', text: res.message });
@@ -885,57 +889,83 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
 
           {/* 5. Promo Code & Bill Summary */}
           <View style={styles.sectionCard}>
-            <Text style={styles.cardHeading}>PROMO CODE</Text>
+            <View style={styles.cardHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Tag size={16} color={COLORS.black} strokeWidth={2.5} />
+                <Text style={styles.cardHeading}>PROMO CODE</Text>
+              </View>
+              {activeCoupon && (
+                <View style={{ backgroundColor: COLORS.secondary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black }}>
+                  <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>ACTIVE</Text>
+                </View>
+              )}
+            </View>
 
-            {/* Quick 1-tap Promo Code from Shop if available */}
-            {shop?.promoCode?.isActive && shop?.promoCode?.code ? (
-              <View style={styles.shopPromoQuickCard}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Tag size={13} color="#0284C7" strokeWidth={3} />
-                    <Text style={styles.shopPromoCodeText}>{shop.promoCode.code}</Text>
-                    <View style={styles.shopPromoBadge}>
-                      <Text style={styles.shopPromoBadgeText}>{shop.promoCode.discountPercent}% OFF</Text>
-                    </View>
+            {activeCoupon ? (
+              <View style={styles.activeCouponBanner}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <CheckCircle2 size={16} color={COLORS.black} strokeWidth={3} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.activeCouponText}>{activeCoupon.code} APPLIED</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#1F2937' }}>
+                      {activeCoupon.discountPercent}% OFF applied to order
+                    </Text>
                   </View>
-                  <Text numberOfLines={1} style={styles.shopPromoSubtext}>
-                    {shop.promoCode.description || `Min order ₹${shop.promoCode.minOrderValue || 0}, max ₹${shop.promoCode.maxDiscount || 'unlimited'}`}
-                  </Text>
                 </View>
                 <TouchableOpacity
-                  activeOpacity={0.8}
                   onPress={() => {
-                    if (!shop?.promoCode) return;
-                    setCouponCode(shop.promoCode.code);
-                    const res = applyCoupon(shop.promoCode.code);
-                    if (res.success) {
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      setCouponMsg({ type: 'success', text: res.message });
-                    } else {
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                      setCouponMsg({ type: 'error', text: res.message });
-                    }
+                    removeCoupon();
+                    setCouponMsg({ type: '', text: '' });
                   }}
-                  style={styles.shopPromoApplyBtn}
+                  style={styles.removeCouponBtn}
                 >
-                  <Text style={styles.shopPromoApplyBtnText}>APPLY NOW</Text>
+                  <Text style={styles.removeCouponBtnText}>REMOVE</Text>
                 </TouchableOpacity>
               </View>
-            ) : null}
+            ) : (
+              <>
+                {/* Available Offer Banner (Tap to autofill & apply, NO duplicate button) */}
+                {shop?.promoCode?.isActive && shop?.promoCode?.code ? (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleApplyCoupon(shop.promoCode.code)}
+                    style={styles.shopPromoQuickCard}
+                  >
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Tag size={13} color="#0284C7" strokeWidth={3} />
+                        <Text style={styles.shopPromoCodeText}>{shop.promoCode.code}</Text>
+                        <View style={styles.shopPromoBadge}>
+                          <Text style={styles.shopPromoBadgeText}>{shop.promoCode.discountPercent}% OFF</Text>
+                        </View>
+                      </View>
+                      <Text numberOfLines={1} style={styles.shopPromoSubtext}>
+                        {shop.promoCode.description || `Min order ₹${shop.promoCode.minOrderValue || 0}, max ₹${shop.promoCode.maxDiscount || 'unlimited'}`}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: COLORS.secondary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: COLORS.black }}>
+                      <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>TAP TO USE</Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
 
-            <View style={styles.couponRow}>
-              <TextInput
-                style={styles.couponInput}
-                placeholder="ENTER COUPON CODE"
-                placeholderTextColor="#9CA3AF"
-                value={couponCode}
-                onChangeText={(t) => setCouponCode(t.toUpperCase())}
-                autoCapitalize="characters"
-              />
-              <BouncyCard onPress={handleApplyCoupon} contentStyle={styles.applyCouponBtn}>
-                <Text style={styles.applyCouponText}>APPLY</Text>
-              </BouncyCard>
-            </View>
+                {/* Single unified Apply Row */}
+                <View style={styles.couponRow}>
+                  <TextInput
+                    style={styles.couponInput}
+                    placeholder={shop?.promoCode?.isActive && shop?.promoCode?.code ? `e.g. ${shop.promoCode.code}` : "ENTER COUPON CODE"}
+                    placeholderTextColor="#9CA3AF"
+                    value={couponCode}
+                    onChangeText={(t) => setCouponCode(t.toUpperCase())}
+                    autoCapitalize="characters"
+                  />
+                  <BouncyCard onPress={() => handleApplyCoupon()} contentStyle={styles.applyCouponBtn}>
+                    <Text style={styles.applyCouponText}>APPLY</Text>
+                  </BouncyCard>
+                </View>
+              </>
+            )}
+
             {couponMsg.text ? (
               <Text
                 style={[
@@ -946,18 +976,6 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                 {couponMsg.text}
               </Text>
             ) : null}
-
-            {activeCoupon && (
-              <View style={styles.activeCouponBanner}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <CheckCircle2 size={16} color={COLORS.black} strokeWidth={3} />
-                  <Text style={styles.activeCouponText}>{activeCoupon.code} APPLIED</Text>
-                </View>
-                <TouchableOpacity onPress={removeCoupon} style={styles.removeCouponBtn}>
-                  <Text style={styles.removeCouponBtnText}>REMOVE</Text>
-                </TouchableOpacity>
-              </View>
-            )}
 
             <View style={styles.billDivider} />
 
