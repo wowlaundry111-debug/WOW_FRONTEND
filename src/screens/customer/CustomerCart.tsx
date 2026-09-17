@@ -34,6 +34,8 @@ import {
   Minus,
   Check,
   ArrowRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -300,6 +302,9 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
       ? shop.pickupTimings
       : ['08:00 AM - 10:00 AM', '10:00 AM - 12:00 PM', '02:00 PM - 04:00 PM', '06:00 PM - 08:00 PM'];
   const [selectedSlot, setSelectedSlot] = useState(TIME_SLOTS[0] || '08:00 AM - 10:00 AM');
+  const [isPickupExpanded, setIsPickupExpanded] = useState(false);
+  const [isAddonsExpanded, setIsAddonsExpanded] = useState(false);
+  const [isItemsExpanded, setIsItemsExpanded] = useState(true);
   const [couponCode, setCouponCode] = useState('');
   const [couponMsg, setCouponMsg] = useState<{ type: string; text: string }>({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
@@ -610,163 +615,272 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
 
           {/* 2. Pickup Slot Selector */}
           <View style={styles.sectionCard}>
-            <View style={styles.cardHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setIsPickupExpanded(!isPickupExpanded);
+              }}
+              style={[
+                styles.cardHeaderRow,
+                { marginBottom: isPickupExpanded ? 10 : 0 },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                 <Clock size={18} color={COLORS.black} strokeWidth={2.5} />
-                <Text style={styles.cardHeading}>PICKUP SCHEDULE</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardHeading}>PICKUP SCHEDULE</Text>
+                  <Text style={styles.cardSubheading} numberOfLines={1}>
+                    {isPickupExpanded ? 'Tap slot below to confirm' : `${selectedDay} • ${selectedSlot}`}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.selectedSlotBadge}>
-                <Text style={styles.selectedSlotBadgeText}>{selectedDay} | {selectedSlot}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.selectedSlotBadge, { backgroundColor: isPickupExpanded ? COLORS.black : COLORS.secondary }]}>
+                  <Text style={[styles.selectedSlotBadgeText, { color: isPickupExpanded ? COLORS.secondary : COLORS.black }]}>
+                    {isPickupExpanded ? 'DONE' : 'CHANGE'}
+                  </Text>
+                </View>
+                {isPickupExpanded ? (
+                  <ChevronUp size={16} color={COLORS.black} strokeWidth={3} />
+                ) : (
+                  <ChevronDown size={16} color={COLORS.black} strokeWidth={3} />
+                )}
               </View>
-            </View>
+            </TouchableOpacity>
 
-            {/* Day Selector */}
-            <View style={styles.daySelectorRow}>
-              {['Today', 'Tomorrow', 'Day After'].map((d) => {
-                const isDaySelected = selectedDay === d;
-                return (
-                  <BouncyCard
-                    key={d}
-                    onPress={() => setSelectedDay(d)}
-                    contentStyle={[styles.dayPill, isDaySelected && styles.dayPillActive]}
-                  >
-                    <Text style={[styles.dayPillText, isDaySelected && styles.dayPillTextActive]}>
-                      {d}
-                    </Text>
-                  </BouncyCard>
-                );
-              })}
-            </View>
+            {/* Collapsible Content */}
+            {isPickupExpanded && (
+              <View style={{ marginTop: 4, paddingTop: 10, borderTopWidth: 1.5, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}>
+                {/* Day Selector */}
+                <View style={styles.daySelectorRow}>
+                  {['Today', 'Tomorrow', 'Day After'].map((d) => {
+                    const isDaySelected = selectedDay === d;
+                    return (
+                      <BouncyCard
+                        key={d}
+                        onPress={() => {
+                          setSelectedDay(d);
+                          Haptics.selectionAsync();
+                        }}
+                        contentStyle={[styles.dayPill, isDaySelected && styles.dayPillActive]}
+                      >
+                        <Text style={[styles.dayPillText, isDaySelected && styles.dayPillTextActive]}>
+                          {d}
+                        </Text>
+                      </BouncyCard>
+                    );
+                  })}
+                </View>
 
-            <View style={styles.timeSlotGrid}>
-              {TIME_SLOTS.map((slot) => {
-                const isSelected = selectedSlot === slot;
-                return (
-                  <BouncyCard
-                    key={slot}
-                    onPress={() => setSelectedSlot(slot)}
-                    contentStyle={[styles.slotPill, isSelected && styles.slotPillActive]}
-                  >
-                    <Text style={[styles.slotPillText, isSelected && styles.slotPillTextActive]}>
-                      {slot}
-                    </Text>
-                  </BouncyCard>
-                );
-              })}
-            </View>
+                <View style={styles.timeSlotGrid}>
+                  {TIME_SLOTS.map((slot) => {
+                    const isSelected = selectedSlot === slot;
+                    return (
+                      <BouncyCard
+                        key={slot}
+                        onPress={() => {
+                          setSelectedSlot(slot);
+                          Haptics.selectionAsync();
+                        }}
+                        contentStyle={[styles.slotPill, isSelected && styles.slotPillActive]}
+                      >
+                        <Text style={[styles.slotPillText, isSelected && styles.slotPillTextActive]}>
+                          {slot}
+                        </Text>
+                      </BouncyCard>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
           </View>
 
           {/* 3. Wash Add-ons & Preferences */}
-          <View style={styles.sectionCard}>
-            <Text style={styles.cardHeading}>WASH ADD-ONS & CARE</Text>
-            <Text style={styles.cardSubheading}>Optional premium wash care for your clothes</Text>
+          {availableWashPrefs.length > 0 && (
+            <View style={styles.sectionCard}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setIsAddonsExpanded(!isAddonsExpanded);
+                }}
+                style={[
+                  styles.cardHeaderRow,
+                  { marginBottom: isAddonsExpanded ? 10 : 0 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <Sparkles size={18} color={COLORS.black} strokeWidth={2.5} />
+                  <View style={{ flex: 1, paddingRight: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.cardHeading}>WASH ADD-ONS</Text>
+                      {selectedPrefs.length > 0 ? (
+                        <View style={{ backgroundColor: COLORS.secondary, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black }}>
+                          <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>
+                            +{selectedPrefs.length} ACTIVE
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: '#E0F2FE', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#0284C7' }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: '#0369A1' }}>OPTIONAL</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text numberOfLines={1} style={styles.cardSubheading}>
+                      {selectedPrefs.length > 0
+                        ? `${selectedPrefs.length} added (+₹${washPrefsCost}) • Tap to modify`
+                        : 'Softener, sanitization & stain treatment'}
+                    </Text>
+                  </View>
+                </View>
 
-            <View style={{ gap: 8, marginTop: 10 }}>
-              {availableWashPrefs.map((pref) => {
-                const isSelected = selectedPrefs.includes(pref.id);
-                return (
-                  <BouncyCard
-                    key={pref.id}
-                    onPress={() => togglePreference(pref.id)}
-                    contentStyle={[styles.addonRow, isSelected && styles.addonRowActive]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.addonTitle}>{pref.name}</Text>
-                      <Text style={styles.addonDesc}>{pref.description}</Text>
-                    </View>
-                    <View style={[styles.addonPriceBadge, isSelected && styles.addonPriceBadgeActive]}>
-                      <Text style={[styles.addonPriceText, isSelected && styles.addonPriceTextActive]}>
-                        {isSelected ? 'ADDED' : `+₹${pref.price}`}
-                      </Text>
-                    </View>
-                  </BouncyCard>
-                );
-              })}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  {isAddonsExpanded ? (
+                    <ChevronUp size={16} color={COLORS.black} strokeWidth={3} />
+                  ) : (
+                    <ChevronDown size={16} color={COLORS.black} strokeWidth={3} />
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              {isAddonsExpanded && (
+                <View style={{ gap: 8, marginTop: 4, paddingTop: 10, borderTopWidth: 1.5, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}>
+                  {availableWashPrefs.map((pref) => {
+                    const isSelected = selectedPrefs.includes(pref.id);
+                    return (
+                      <BouncyCard
+                        key={pref.id}
+                        onPress={() => togglePreference(pref.id)}
+                        contentStyle={[styles.addonRow, isSelected && styles.addonRowActive]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.addonTitle}>{pref.name}</Text>
+                          <Text style={styles.addonDesc}>{pref.description}</Text>
+                        </View>
+                        <View style={[styles.addonPriceBadge, isSelected && styles.addonPriceBadgeActive]}>
+                          <Text style={[styles.addonPriceText, isSelected && styles.addonPriceTextActive]}>
+                            {isSelected ? 'ADDED' : `+₹${pref.price}`}
+                          </Text>
+                        </View>
+                      </BouncyCard>
+                    );
+                  })}
+                </View>
+              )}
             </View>
-          </View>
+          )}
 
           {/* 4. Cart Items Breakdown */}
           <View style={styles.sectionCard}>
-            <Text style={styles.cardHeading}>ORDER ITEMS ({cart.length})</Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setIsItemsExpanded(!isItemsExpanded);
+              }}
+              style={[
+                styles.cardHeaderRow,
+                { marginBottom: isItemsExpanded ? 10 : 0 },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.cardHeading}>ORDER ITEMS ({cart.length})</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: COLORS.black, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>
+                    {isItemsExpanded ? 'HIDE' : 'REVIEW'}
+                  </Text>
+                </View>
+                {isItemsExpanded ? (
+                  <ChevronUp size={16} color={COLORS.black} strokeWidth={3} />
+                ) : (
+                  <ChevronDown size={16} color={COLORS.black} strokeWidth={3} />
+                )}
+              </View>
+            </TouchableOpacity>
 
-            <View style={{ marginTop: 10 }}>
-              {cart.map((item, idx) => {
-                const isKg = isKgItem(item);
-                return (
-                  <View key={item.itemId}>
-                    <View style={styles.cartItemRow}>
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <Text style={styles.cartItemName}>{item.name}</Text>
-                        {(item.categoryName || item.subCategoryName) && (
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748B', marginTop: 1 }}>
-                            {item.categoryName}{item.subCategoryName ? ` › ${item.subCategoryName}` : ''}{item.isBucket ? ' • Bucket' : ''}
-                          </Text>
-                        )}
-                        {item.isBucket && !item.categoryName && (
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: COLORS.black, backgroundColor: COLORS.secondary, alignSelf: 'flex-start', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, marginTop: 1 }}>
-                            Bucket
-                          </Text>
-                        )}
-                        {isKg ? (
-                          <Text style={[styles.cartItemRate, { color: '#0284C7', fontWeight: '800' }]}>
-                            {item.pricePerKg ? `₹${item.pricePerKg}/kg · Weighed at delivery` : 'Weighed at delivery'}
-                          </Text>
-                        ) : (
-                          <Text style={styles.cartItemRate}>₹{item.price} per unit</Text>
-                        )}
+            {isItemsExpanded && (
+              <View style={{ marginTop: 4, paddingTop: 6, borderTopWidth: 1.5, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}>
+                {cart.map((item, idx) => {
+                  const isKg = isKgItem(item);
+                  return (
+                    <View key={item.itemId}>
+                      <View style={styles.cartItemRow}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={styles.cartItemName}>{item.name}</Text>
+                          {(item.categoryName || item.subCategoryName) && (
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748B', marginTop: 1 }}>
+                              {item.categoryName}{item.subCategoryName ? ` › ${item.subCategoryName}` : ''}{item.isBucket ? ' • Bucket' : ''}
+                            </Text>
+                          )}
+                          {item.isBucket && !item.categoryName && (
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: COLORS.black, backgroundColor: COLORS.secondary, alignSelf: 'flex-start', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, marginTop: 1 }}>
+                              Bucket
+                            </Text>
+                          )}
+                          {isKg ? (
+                            <Text style={[styles.cartItemRate, { color: '#0284C7', fontWeight: '800' }]}>
+                              {item.pricePerKg ? `₹${item.pricePerKg}/kg · Weighed at delivery` : 'Weighed at delivery'}
+                            </Text>
+                          ) : (
+                            <Text style={styles.cartItemRate}>₹{item.price} per unit</Text>
+                          )}
+                        </View>
+
+                        <View style={styles.cartStepper}>
+                          <TouchableOpacity
+                            style={styles.cartStepperBtn}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              addToCart(
+                                {
+                                  _id: item.itemId,
+                                  name: item.name,
+                                  pricePerItem: item.price,
+                                  unit: item.unit,
+                                  shopId: currentTenantId || '',
+                                  categoryId: '',
+                                } as any,
+                                -1
+                              );
+                            }}
+                          >
+                            <Minus size={12} color={COLORS.black} strokeWidth={3} />
+                          </TouchableOpacity>
+                          <Text style={styles.cartStepperQty}>{item.quantity}</Text>
+                          <TouchableOpacity
+                            style={[styles.cartStepperBtn, { backgroundColor: COLORS.secondary }]}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              addToCart(
+                                {
+                                  _id: item.itemId,
+                                  name: item.name,
+                                  pricePerItem: item.price,
+                                  unit: item.unit,
+                                  shopId: currentTenantId || '',
+                                  categoryId: '',
+                                } as any,
+                                1
+                              );
+                            }}
+                          >
+                            <Plus size={12} color={COLORS.black} strokeWidth={3} />
+                          </TouchableOpacity>
+                        </View>
+
+                        <Text style={[styles.cartItemTotal, isKg && { fontSize: 13, color: '#0284C7' }]}>
+                          {isKg ? 'Pending' : `₹${(item.price || 0) * item.quantity}`}
+                        </Text>
                       </View>
-
-                      <View style={styles.cartStepper}>
-                        <TouchableOpacity
-                          style={styles.cartStepperBtn}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            addToCart(
-                              {
-                                _id: item.itemId,
-                                name: item.name,
-                                pricePerItem: item.price,
-                                unit: item.unit,
-                                shopId: currentTenantId || '',
-                                categoryId: '',
-                              } as any,
-                              -1
-                            );
-                          }}
-                        >
-                          <Minus size={12} color={COLORS.black} strokeWidth={3} />
-                        </TouchableOpacity>
-                        <Text style={styles.cartStepperQty}>{item.quantity}</Text>
-                        <TouchableOpacity
-                          style={[styles.cartStepperBtn, { backgroundColor: COLORS.secondary }]}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            addToCart(
-                              {
-                                _id: item.itemId,
-                                name: item.name,
-                                pricePerItem: item.price,
-                                unit: item.unit,
-                                shopId: currentTenantId || '',
-                                categoryId: '',
-                              } as any,
-                              1
-                            );
-                          }}
-                        >
-                          <Plus size={12} color={COLORS.black} strokeWidth={3} />
-                        </TouchableOpacity>
-                      </View>
-
-                      <Text style={[styles.cartItemTotal, isKg && { fontSize: 13, color: '#0284C7' }]}>
-                        {isKg ? 'Pending' : `₹${(item.price || 0) * item.quantity}`}
-                      </Text>
+                      {idx < cart.length - 1 && <View style={styles.itemDivider} />}
                     </View>
-                    {idx < cart.length - 1 && <View style={styles.itemDivider} />}
-                  </View>
-                );
-              })}
-            </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           {/* 5. Promo Code & Bill Summary */}
