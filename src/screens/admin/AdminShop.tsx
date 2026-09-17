@@ -413,7 +413,10 @@ export const AdminShopScreen: React.FC = () => {
   const shouldShowSection = (id: SectionId) => activeTab === 'all' || activeTab === id;
 
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View style={{ flex: 1, marginRight: 8 }}>
@@ -1236,7 +1239,7 @@ export const AdminShopScreen: React.FC = () => {
           <Text style={styles.logoutBtnText}>LOGOUT OF ADMIN PANEL</Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

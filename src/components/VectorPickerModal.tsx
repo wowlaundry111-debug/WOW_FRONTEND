@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { X, Search, Sparkles, Check } from 'lucide-react-native';
@@ -49,8 +51,11 @@ export const VectorPickerModal: React.FC<VectorPickerModalProps> = ({
   });
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.overlay}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
@@ -98,7 +103,11 @@ export const VectorPickerModal: React.FC<VectorPickerModalProps> = ({
           </ScrollView>
 
           {/* Grid of 30 Vectors */}
-          <ScrollView style={styles.gridScroll} contentContainerStyle={styles.gridContainer}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            style={styles.gridScroll}
+            contentContainerStyle={styles.gridContainer}
+          >
             {filtered.map((item) => {
               const isSelected = selectedUrl === item.url;
               return (
@@ -135,7 +144,7 @@ export const VectorPickerModal: React.FC<VectorPickerModalProps> = ({
             })}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

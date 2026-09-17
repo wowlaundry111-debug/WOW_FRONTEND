@@ -24,7 +24,8 @@
         "foregroundImage": "./assets/iconic.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.salgotra111.Frontend"
+      "package": "com.salgotra111.Frontend",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./assets/favicon.png"

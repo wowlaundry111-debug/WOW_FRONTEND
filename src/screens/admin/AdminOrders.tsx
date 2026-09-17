@@ -13,6 +13,7 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import {
   User,
@@ -160,24 +161,27 @@ const WeighKgModal: React.FC<WeighKgModalProps> = ({
   const grandTotal = Math.max(0, Math.round((itemSubtotal + taxAmt + deliveryAmt - liveDiscount + prefsTotal) * 100) / 100);
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <View>
-              <Text style={styles.modalPreHeading}>ADMIN PICKUP & SCALE</Text>
-              <Text style={styles.modalHeading}>WEIGH & CALCULATE PRICE</Text>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalPreHeading}>ADMIN PICKUP & SCALE</Text>
+                <Text style={styles.modalHeading}>WEIGH & CALCULATE PRICE</Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+                <X size={22} color={COLORS.black} strokeWidth={3} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
-              <X size={22} color={COLORS.black} strokeWidth={3} />
-            </TouchableOpacity>
-          </View>
 
-          <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 12, fontWeight: '700' }}>
-            Enter physical scale weight. Prices and totals recalculate live on your screen.
-          </Text>
+            <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 12, fontWeight: '700' }}>
+              Enter physical scale weight. Prices and totals recalculate live on your screen.
+            </Text>
 
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 260 }}>
             {kgItems.map((it) => {
               const catItem = (catalogItems || []).find((c) => String(c._id) === String(it.itemId) || c.name === it.name);
               const rate = catItem?.pricePerKg || (it.unit === 'KG' && it.price > 0 && !it.kgWeight ? it.price : 0) || 60;
@@ -236,50 +240,50 @@ const WeighKgModal: React.FC<WeighKgModalProps> = ({
                 </View>
               );
             })}
-          </ScrollView>
 
-          {/* Live Recalculation Preview Card */}
-          <View style={styles.weighLiveCard}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: '#166534' }}>Weighed KG Subtotal:</Text>
-              <Text style={{ fontSize: 14, fontWeight: '900', color: '#166534' }}>+₹{Math.round(kgTotal * 100) / 100}</Text>
-            </View>
-            {perItemSubtotal > 0 && (
+            {/* Live Recalculation Preview Card */}
+            <View style={styles.weighLiveCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#374151' }}>Piece Items:</Text>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#374151' }}>₹{perItemSubtotal}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: '#166534' }}>Weighed KG Subtotal:</Text>
+                <Text style={{ fontSize: 14, fontWeight: '900', color: '#166534' }}>+₹{Math.round(kgTotal * 100) / 100}</Text>
               </View>
-            )}
-            {liveDiscount > 0 && (
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>
-                  Promo ({order.couponCode || 'Coupon'}):
+              {perItemSubtotal > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#374151' }}>Piece Items:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#374151' }}>₹{perItemSubtotal}</Text>
+                </View>
+              )}
+              {liveDiscount > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>
+                    Promo ({order.couponCode || 'Coupon'}):
+                  </Text>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: '#15803D' }}>-₹{liveDiscount}</Text>
+                </View>
+              )}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderColor: '#BBF7D0' }}>
+                <Text style={{ fontSize: 13, fontWeight: '900', color: COLORS.black }}>New Grand Total:</Text>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#0369A1' }}>₹{grandTotal}</Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              <TouchableOpacity style={[styles.weighBtn, { backgroundColor: '#F3F4F6' }]} onPress={onClose} disabled={submitting}>
+                <Text style={[styles.weighBtnText, { color: COLORS.black }]}>SAVE WEIGHT</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.weighBtn, { backgroundColor: '#B0FF49', flex: 1.6 }]}
+                onPress={() => handleSave(true)}
+                disabled={submitting}
+              >
+                <Text style={[styles.weighBtnText, { color: COLORS.black }]}>
+                  {submitting ? 'SAVING...' : 'SAVE & MARK PICKED UP'}
                 </Text>
-                <Text style={{ fontSize: 12, fontWeight: '900', color: '#15803D' }}>-₹{liveDiscount}</Text>
-              </View>
-            )}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderColor: '#BBF7D0' }}>
-              <Text style={{ fontSize: 13, fontWeight: '900', color: COLORS.black }}>New Grand Total:</Text>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: '#0369A1' }}>₹{grandTotal}</Text>
+              </TouchableOpacity>
             </View>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-            <TouchableOpacity style={[styles.weighBtn, { backgroundColor: '#F3F4F6' }]} onPress={() => handleSave(false)} disabled={submitting}>
-              <Text style={[styles.weighBtnText, { color: COLORS.black }]}>SAVE WEIGHT</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.weighBtn, { backgroundColor: '#B0FF49', flex: 1.6 }]}
-              onPress={() => handleSave(true)}
-              disabled={submitting}
-            >
-              <Text style={[styles.weighBtnText, { color: COLORS.black }]}>
-                {submitting ? 'SAVING...' : 'SAVE & MARK PICKED UP'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -844,9 +848,12 @@ export const AdminOrdersScreen: React.FC = () => {
       </ScrollView>
 
       {/* Order Details & Edit Modal */}
-      <Modal visible={!!selectedOrder} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+      <Modal visible={!!selectedOrder} transparent animationType="slide" onRequestClose={() => setSelectedOrder(null)}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalPreHeading}>ORDER DETAILS</Text>
@@ -862,6 +869,7 @@ export const AdminOrdersScreen: React.FC = () => {
             <ScrollView 
               style={{ maxHeight: Math.min(540, Dimensions.get('window').height * 0.72) }} 
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               {selectedOrder && (
                 <View style={{ gap: 14, paddingBottom: 10 }}>
@@ -1222,13 +1230,16 @@ export const AdminOrdersScreen: React.FC = () => {
               <Text style={styles.saveOrderBtnText}>SAVE DETAILS</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Assign Delivery Boy Modal */}
-      <Modal visible={!!assignModalOrder} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+      <Modal visible={!!assignModalOrder} transparent animationType="slide" onRequestClose={() => setAssignModalOrder(null)}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalHeading}>ASSIGN DELIVERY STAFF</Text>
               <TouchableOpacity onPress={() => setAssignModalOrder(null)}>
@@ -1263,7 +1274,7 @@ export const AdminOrdersScreen: React.FC = () => {
               )}
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       {/* Weigh KG Modal (Admin Pickup / Scale Measurement) */}
       <WeighKgModal
@@ -1591,6 +1602,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.black,
     padding: SPACING.lg,
     paddingBottom: 40,
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',

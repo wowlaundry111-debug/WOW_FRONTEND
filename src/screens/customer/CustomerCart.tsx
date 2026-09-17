@@ -11,6 +11,7 @@ import {
   Dimensions,
   Animated,
   Easing,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -454,7 +455,10 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
 
   // ─── Filled Cart / Checkout Screen ───────────────────────────────────────
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <StatusBar style="light" backgroundColor="#061E38" translucent />
 
       {/* Top Overscroll Blue Background Filler */}
@@ -921,7 +925,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
         </BouncyCard>
       </View>
 
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

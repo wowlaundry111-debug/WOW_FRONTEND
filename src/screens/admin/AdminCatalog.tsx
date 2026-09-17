@@ -386,10 +386,10 @@ export const AdminCatalogScreen: React.FC = () => {
       )}
 
       {/* Add Category Modal */}
-      <Modal visible={isAddCatVisible} transparent animationType="slide">
+      <Modal visible={isAddCatVisible} transparent animationType="slide" onRequestClose={() => setAddCatVisible(false)}>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalHeading}>
@@ -495,10 +495,10 @@ export const AdminCatalogScreen: React.FC = () => {
       </Modal>
 
       {/* Edit Category Modal */}
-      <Modal visible={!!editingCat} transparent animationType="slide">
+      <Modal visible={!!editingCat} transparent animationType="slide" onRequestClose={() => setEditingCat(null)}>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.modalContent}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>

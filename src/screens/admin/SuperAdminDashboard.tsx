@@ -209,10 +209,10 @@ export const SuperAdminDashboard: React.FC = () => {
       })}
 
       {/* Add Branch Modal */}
-      <Modal visible={isAddModalOpen} transparent animationType="slide">
+      <Modal visible={isAddModalOpen} transparent animationType="slide" onRequestClose={() => setIsAddModalOpen(false)}>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>

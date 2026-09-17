@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   RefreshControl, Linking, Modal, ActivityIndicator, Dimensions,
-  Animated, Easing, Alert,
+  Animated, Easing, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -165,9 +165,12 @@ const VerifyOrderModal = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.modalContent, { maxHeight: '90%' }]}>
           <Text style={styles.modalHeading}>VERIFY PICKED ITEMS</Text>
           {(() => {
             const isKgCheck = (it: any) => it.unit === 'KG' || (typeof it.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) || Boolean(it.kgWeight && it.kgWeight > 0);
@@ -251,7 +254,7 @@ const VerifyOrderModal = ({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -315,15 +318,29 @@ const WeighKgModal = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalHeading}>WEIGH CLOTHES AT PICKUP</Text>
-          <Text style={{ fontSize: 13, color: '#4B5563', marginBottom: 16 }}>
-            Enter exact weight in KG. Final price will be calculated and locked at pickup.
-          </Text>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 10 }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.modalHeading}>WEIGH CLOTHES AT PICKUP</Text>
+                <Text style={{ fontSize: 12, color: '#4B5563', marginTop: 2, fontWeight: '700' }}>
+                  Enter exact weight in KG. Final price will be calculated and locked at pickup.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn} disabled={submitting}>
+                <X size={20} color={COLORS.black} strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 300 }}>
             {kgItems.map((it) => {
               const catItem = catalogItems.find(c => c._id === it.itemId || c.name === it.name);
               const rate = catItem?.pricePerKg || (catItem as any)?.price || 60;
@@ -382,69 +399,69 @@ const WeighKgModal = ({
                 </View>
               );
             })}
-          </ScrollView>
 
-          {(() => {
-            const kgTotal = calculateLiveTotal();
-            const perItemSubtotal = order.items
-              .filter(it => !isKgCheck(it))
-              .reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
-            const itemSubtotal = kgTotal + perItemSubtotal;
+            {(() => {
+              const kgTotal = calculateLiveTotal();
+              const perItemSubtotal = order.items
+                .filter(it => !isKgCheck(it))
+                .reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+              const itemSubtotal = kgTotal + perItemSubtotal;
 
-            let liveDiscount = Number(order.discountAmount) || 0;
-            if (order.couponCode) {
-              const discountPercent = Number(order.couponDiscountPercent) || 0;
-              const maxDiscount = order.couponMaxDiscount !== undefined ? Number(order.couponMaxDiscount) : Infinity;
-              const minOrder = Number(order.couponMinOrderValue) || 0;
+              let liveDiscount = Number(order.discountAmount) || 0;
+              if (order.couponCode) {
+                const discountPercent = Number(order.couponDiscountPercent) || 0;
+                const maxDiscount = order.couponMaxDiscount !== undefined ? Number(order.couponMaxDiscount) : Infinity;
+                const minOrder = Number(order.couponMinOrderValue) || 0;
 
-              if (discountPercent > 0) {
-                if (itemSubtotal >= minOrder) {
-                  liveDiscount = Math.min((itemSubtotal * discountPercent) / 100, maxDiscount);
-                  liveDiscount = Math.round(liveDiscount * 100) / 100;
-                } else {
-                  liveDiscount = 0;
+                if (discountPercent > 0) {
+                  if (itemSubtotal >= minOrder) {
+                    liveDiscount = Math.min((itemSubtotal * discountPercent) / 100, maxDiscount);
+                    liveDiscount = Math.round(liveDiscount * 100) / 100;
+                  } else {
+                    liveDiscount = 0;
+                  }
                 }
               }
-            }
 
-            return (
-              <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderRadius: 8, marginTop: 12, borderWidth: 1, borderColor: '#BBF7D0', gap: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#166534' }}>Estimated KG Total:</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#166534' }}>₹{kgTotal.toFixed(0)}</Text>
-                </View>
-                {(liveDiscount > 0 || order.couponCode) ? (
+              return (
+                <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderRadius: 8, marginTop: 12, borderWidth: 1, borderColor: '#BBF7D0', gap: 4 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>
-                      Promo ({order.couponCode || 'Coupon'}):
-                    </Text>
-                    <Text style={{ fontSize: 12, fontWeight: '900', color: '#15803D' }}>
-                      {liveDiscount > 0 ? `-₹${liveDiscount.toFixed(0)}` : 'Applied upon weighing'}
-                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#166534' }}>Estimated KG Total:</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#166534' }}>₹{kgTotal.toFixed(0)}</Text>
                   </View>
-                ) : null}
-              </View>
-            );
-          })()}
+                  {(liveDiscount > 0 || order.couponCode) ? (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>
+                        Promo ({order.couponCode || 'Coupon'}):
+                      </Text>
+                      <Text style={{ fontSize: 12, fontWeight: '900', color: '#15803D' }}>
+                        {liveDiscount > 0 ? `-₹${liveDiscount.toFixed(0)}` : 'Applied upon weighing'}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })()}
 
-          <View style={styles.modalActionRow}>
-            <TouchableOpacity style={styles.modalCancelBtn} onPress={onClose} disabled={submitting}>
-              <Text style={styles.modalCancelText}>CANCEL</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalConfirmBtn, { backgroundColor: '#B0FF49' }]}
-              onPress={() => handleSave(true)}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color={COLORS.black} />
-              ) : (
-                <Text style={styles.modalConfirmText}>CONFIRM PICKUP & FINAL PRICE</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={onClose} disabled={submitting}>
+                <Text style={styles.modalCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, { backgroundColor: '#B0FF49' }]}
+                onPress={() => handleSave(true)}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color={COLORS.black} />
+                ) : (
+                  <Text style={styles.modalConfirmText}>CONFIRM PICKUP & FINAL PRICE</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -482,102 +499,107 @@ const PaymentModal = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { paddingBottom: 48 }]}>
-          {/* Header */}
-          <View style={styles.payModalHeader}>
-            <View>
-              <Text style={styles.modalHeading}>COLLECT PAYMENT</Text>
-              <Text style={styles.payOrderId}>
-                Order #{order._id.slice(-6).toUpperCase()} · {order.customerName}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} disabled={paying}>
-              <X size={20} color={COLORS.black} strokeWidth={2.5} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Amount Badge */}
-          <View style={styles.amountBadge}>
-            <Text style={styles.amountLabel}>AMOUNT DUE</Text>
-            <Text style={styles.amountValue}>₹{order.totalAmount.toFixed(2)}</Text>
-          </View>
-
-          {/* QR Code Section */}
-          {dynamicQr ? (
-            <View style={styles.qrSection}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-                <Smartphone size={18} color={COLORS.black} strokeWidth={2.5} />
-                <Text style={styles.qrInstruction}>
-                  Ask the customer to scan and pay via any UPI app
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: 24 }]}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Header */}
+            <View style={styles.payModalHeader}>
+              <View>
+                <Text style={styles.modalHeading}>COLLECT PAYMENT</Text>
+                <Text style={styles.payOrderId}>
+                  Order #{order._id.slice(-6).toUpperCase()} · {order.customerName}
                 </Text>
               </View>
-              <View style={styles.qrBox}>
-                <QRCode
-                  value={dynamicQr}
-                  size={200}
-                  backgroundColor="white"
-                  color={COLORS.black}
-                />
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn} disabled={paying}>
+                <X size={20} color={COLORS.black} strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Amount Badge */}
+            <View style={styles.amountBadge}>
+              <Text style={styles.amountLabel}>AMOUNT DUE</Text>
+              <Text style={styles.amountValue}>₹{order.totalAmount.toFixed(2)}</Text>
+            </View>
+
+            {/* QR Code Section */}
+            {dynamicQr ? (
+              <View style={styles.qrSection}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+                  <Smartphone size={18} color={COLORS.black} strokeWidth={2.5} />
+                  <Text style={styles.qrInstruction}>
+                    Ask the customer to scan and pay via any UPI app
+                  </Text>
+                </View>
+                <View style={styles.qrBox}>
+                  <QRCode
+                    value={dynamicQr}
+                    size={200}
+                    backgroundColor="white"
+                    color={COLORS.black}
+                  />
+                </View>
+                <Text style={styles.qrHint}>UPI · Google Pay · PhonePe · Paytm</Text>
               </View>
-              <Text style={styles.qrHint}>UPI · Google Pay · PhonePe · Paytm</Text>
+            ) : (
+              <View style={styles.noUpiBox}>
+                <AlertTriangle size={24} color={COLORS.black} strokeWidth={2.5} style={{ marginBottom: 4 }} />
+                <Text style={styles.noUpiText}>UPI not configured by admin</Text>
+                <Text style={styles.noUpiSub}>Collect cash from the customer</Text>
+              </View>
+            )}
+
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>MARK PAYMENT AS</Text>
+              <View style={styles.dividerLine} />
             </View>
-          ) : (
-            <View style={styles.noUpiBox}>
-              <AlertTriangle size={24} color={COLORS.black} strokeWidth={2.5} style={{ marginBottom: 4 }} />
-              <Text style={styles.noUpiText}>UPI not configured by admin</Text>
-              <Text style={styles.noUpiSub}>Collect cash from the customer</Text>
+
+            {/* Payment Action Buttons */}
+            <View style={styles.payBtnsRow}>
+              {/* Cash */}
+              <TouchableOpacity
+                style={[styles.payBtn, styles.payBtnCash]}
+                onPress={() => handlePay('COD')}
+                disabled={paying}
+              >
+                {paying ? (
+                  <ActivityIndicator color={COLORS.black} size="small" />
+                ) : (
+                  <>
+                    <Banknote size={22} color={COLORS.black} strokeWidth={2.5} />
+                    <Text style={[styles.payBtnText, { color: COLORS.black }]}>
+                      CASH{'\n'}COLLECTED
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* Online / UPI */}
+              <TouchableOpacity
+                style={[styles.payBtn, styles.payBtnOnline]}
+                onPress={() => handlePay('UPI')}
+                disabled={paying || !dynamicQr}
+              >
+                {paying ? (
+                  <ActivityIndicator color={COLORS.white} size="small" />
+                ) : (
+                  <>
+                    <Wifi size={22} color={COLORS.white} strokeWidth={2.5} />
+                    <Text style={[styles.payBtnText, { color: COLORS.white }]}>
+                      ONLINE{'\n'}PAID
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-          )}
-
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>MARK PAYMENT AS</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Payment Action Buttons */}
-          <View style={styles.payBtnsRow}>
-            {/* Cash */}
-            <TouchableOpacity
-              style={[styles.payBtn, styles.payBtnCash]}
-              onPress={() => handlePay('COD')}
-              disabled={paying}
-            >
-              {paying ? (
-                <ActivityIndicator color={COLORS.black} size="small" />
-              ) : (
-                <>
-                  <Banknote size={22} color={COLORS.black} strokeWidth={2.5} />
-                  <Text style={[styles.payBtnText, { color: COLORS.black }]}>
-                    CASH{'\n'}COLLECTED
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Online / UPI */}
-            <TouchableOpacity
-              style={[styles.payBtn, styles.payBtnOnline]}
-              onPress={() => handlePay('UPI')}
-              disabled={paying || !dynamicQr}
-            >
-              {paying ? (
-                <ActivityIndicator color={COLORS.white} size="small" />
-              ) : (
-                <>
-                  <Wifi size={22} color={COLORS.white} strokeWidth={2.5} />
-                  <Text style={[styles.payBtnText, { color: COLORS.white }]}>
-                    ONLINE{'\n'}PAID
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -1505,6 +1527,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.black,
     padding: SPACING.lg,
     paddingBottom: 40,
+    maxHeight: '90%',
   },
   modalHeading: {
     fontSize: 18,

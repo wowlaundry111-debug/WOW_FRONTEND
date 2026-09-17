@@ -202,7 +202,10 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.modalBody}>
           {/* Header */}
           <View style={styles.headerRow}>
@@ -569,7 +572,7 @@ export const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
             )}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
       <VectorPickerModal
         visible={isVectorPickerOpen}
         selectedUrl={vectorTarget === 'item' ? newItemImage : editCatImage}
