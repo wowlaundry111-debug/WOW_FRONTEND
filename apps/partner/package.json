@@ -1,12 +1,17 @@
 {
-  "name": "frontend",
+  "name": "wow-partner-app",
   "version": "1.0.0",
-  "main": "expo/AppEntry.js",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
   "dependencies": {
     "@expo-google-fonts/outfit": "^0.4.3",
     "@expo/metro-runtime": "~6.1.2",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@tanstack/react-query": "^5.100.14",
     "axios": "^1.16.1",
     "expo": "^54.0.35",
     "expo-asset": "~12.0.13",
@@ -39,22 +44,6 @@
     "@types/react-native": "^0.72.8",
     "eas-cli": "^23.2.0",
     "typescript": "~5.9.2"
-  },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "start:customer": "npm run start --prefix apps/customer",
-    "start:partner": "npm run start --prefix apps/partner",
-    "android:customer": "npm run android --prefix apps/customer",
-    "android:partner": "npm run android --prefix apps/partner",
-    "ios:customer": "npm run ios --prefix apps/customer",
-    "ios:partner": "npm run ios --prefix apps/partner",
-    "web:customer": "npm run web --prefix apps/customer",
-    "web:partner": "npm run web --prefix apps/partner",
-    "build:customer": "cd apps/customer && eas build",
-    "build:partner": "cd apps/partner && eas build"
   },
   "private": true
 }

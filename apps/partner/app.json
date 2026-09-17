@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "WoW Partner",
+    "slug": "Frontend",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/iconic.png",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#002B2E"
+    },
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.wowlaundry.partner",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Allow WoW Partner to access your location for route navigation and delivery task tracking."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#002B2E",
+        "foregroundImage": "./assets/iconic.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "in.wowlaundry.partner",
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-asset",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow WoW Partner to access your location for route navigation and delivery task tracking.",
+          "locationWhenInUsePermission": "Allow WoW Partner to access your location for route navigation and delivery task tracking."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/iconic.png",
+          "color": "#002B2E",
+          "defaultChannel": "wow_laundry_channel"
+        }
+      ]
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "owner": "wow_laundry",
+    "extra": {
+      "eas": {
+        "projectId": "f146fe1a-3e90-4af0-9562-6feb058485b4"
+      }
+    }
+  }
+}
