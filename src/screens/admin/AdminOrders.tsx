@@ -32,6 +32,7 @@ import {
   Sparkles,
   Package,
   Scale,
+  Trash2,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
@@ -300,6 +301,7 @@ export const AdminOrdersScreen: React.FC = () => {
     assignDeliveryBoy,
     updateOrderAdminDetails,
     updateKgWeight,
+    deleteOrder,
     fetchOrders,
   } = useAppStore();
 
@@ -308,6 +310,7 @@ export const AdminOrdersScreen: React.FC = () => {
   const [assignModalOrder, setAssignModalOrder] = useState<Order | null>(null);
   const [weighModalOrder, setWeighModalOrder] = useState<Order | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
 
   const [editPrice, setEditPrice] = useState('');
   const [editNotes, setEditNotes] = useState('');
@@ -414,6 +417,43 @@ export const AdminOrdersScreen: React.FC = () => {
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to assign delivery staff');
     }
+  };
+
+  const handleDeleteOrder = (order: Order | null) => {
+    if (!order) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    const orderNum = order._id.slice(-6).toUpperCase();
+    Alert.alert(
+      'Delete Order Permanently',
+      `Are you sure you want to permanently delete order #${orderNum} from the system?\n\nThis action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Order',
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeletingOrder(true);
+            try {
+              const res = await deleteOrder(order._id);
+              if (res.success) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                if (selectedOrder && selectedOrder._id === order._id) {
+                  setSelectedOrder(null);
+                }
+                Alert.alert('Order Deleted', `Order #${orderNum} has been permanently deleted from the system.`);
+              } else {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                Alert.alert('Error', res.message || 'Failed to delete order.');
+              }
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to delete order.');
+            } finally {
+              setIsDeletingOrder(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleExport = () => {
@@ -527,14 +567,23 @@ export const AdminOrdersScreen: React.FC = () => {
               activeOpacity={0.9}
               onPress={() => handleOpenOrderModal(order)}
             >
-              {/* Top Row: Order ID + Status */}
+              {/* Top Row: Order ID + Status & Delete */}
               <View style={styles.orderCardTop}>
                 <View style={styles.orderIdBadge}>
                   <Text style={styles.orderIdText}>
                     #{order._id.slice(-6).toUpperCase()}
                   </Text>
                 </View>
-                <StatusBadge status={order.status} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <StatusBadge status={order.status} />
+                  <TouchableOpacity
+                    onPress={() => handleDeleteOrder(order)}
+                    style={styles.cardDeleteBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Trash2 size={13} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Customer Row */}
@@ -861,9 +910,18 @@ export const AdminOrdersScreen: React.FC = () => {
                   #{selectedOrder?._id.slice(-6).toUpperCase()}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.modalCloseBtn}>
-                <X size={22} color={COLORS.black} strokeWidth={3} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => handleDeleteOrder(selectedOrder)}
+                  style={[styles.modalCloseBtn, { backgroundColor: '#FEE2E2', borderColor: '#DC2626' }]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Trash2 size={18} color="#DC2626" strokeWidth={2.5} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.modalCloseBtn}>
+                  <X size={22} color={COLORS.black} strokeWidth={3} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <ScrollView 
@@ -1222,13 +1280,26 @@ export const AdminOrdersScreen: React.FC = () => {
               )}
             </ScrollView>
 
-            <TouchableOpacity
-              style={styles.saveOrderBtn}
-              onPress={handleSaveDetails}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.saveOrderBtnText}>SAVE DETAILS</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+              <TouchableOpacity
+                style={[styles.deleteOrderBtn, { flex: 1 }]}
+                onPress={() => handleDeleteOrder(selectedOrder)}
+                disabled={isDeletingOrder}
+                activeOpacity={0.85}
+              >
+                <Trash2 size={16} color={COLORS.white} />
+                <Text style={styles.deleteOrderBtnText}>
+                  {isDeletingOrder ? 'DELETING...' : 'DELETE ORDER'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveOrderBtn, { flex: 1.4, marginTop: 0 }]}
+                onPress={handleSaveDetails}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.saveOrderBtnText}>SAVE DETAILS</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -2051,6 +2122,34 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_800ExtraBold',
     color: COLORS.white,
     letterSpacing: 0.8,
+  },
+  deleteOrderBtn: {
+    backgroundColor: '#DC2626',
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.xl,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    ...NEO_SHADOW.box4,
+  },
+  deleteOrderBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: COLORS.white,
+    letterSpacing: 0.8,
+  },
+  cardDeleteBtn: {
+    padding: 6,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1.5,
+    borderColor: '#DC2626',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   boySelectCard: {
     flexDirection: 'row',

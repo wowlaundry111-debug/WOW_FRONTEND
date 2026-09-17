@@ -35,6 +35,13 @@ export const SocketManager: React.FC = () => {
         }
       };
 
+      const onOrderDeleted = ({ orderId }: { orderId: string }) => {
+        useAppStore.setState((state) => ({
+          orders: state.orders.filter((o) => String(o._id) !== String(orderId)),
+          orderTotal: Math.max(0, (state.orderTotal || state.orders.length) - 1),
+        }));
+      };
+
       // ── Shop Events ──────────────────────────────────────────────────────────────
       const onShopCreated = (shop: any) => {
         useAppStore.setState((state) => ({
@@ -133,6 +140,7 @@ export const SocketManager: React.FC = () => {
       // Register listeners
       socket.on('order_created', onOrderCreated);
       socket.on('order_updated', onOrderUpdated);
+      socket.on('order_deleted', onOrderDeleted);
       socket.on('shop_created', onShopCreated);
       socket.on('shop_updated', onShopUpdated);
       socket.on('shop_deleted', onShopDeleted);
@@ -152,6 +160,7 @@ export const SocketManager: React.FC = () => {
       return () => {
         socket.off('order_created', onOrderCreated);
         socket.off('order_updated', onOrderUpdated);
+        socket.off('order_deleted', onOrderDeleted);
         socket.off('shop_created', onShopCreated);
         socket.off('shop_updated', onShopUpdated);
         socket.off('shop_deleted', onShopDeleted);
