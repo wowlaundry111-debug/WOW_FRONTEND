@@ -43,6 +43,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 import { useAppStore } from '../../store/useAppStore';
+import { sortShopsWithLpuFirst, sortBranchesWithLpuFirst } from '../../utils/branchHelper';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedView = Animated.View as any;
@@ -695,8 +696,9 @@ export const CustomerProfileScreen = ({ onNavigateToOrders }: { onNavigateToOrde
               </TouchableOpacity>
             </View>
 
-            {shops.map((s) => {
+            {sortShopsWithLpuFirst(shops).map((s) => {
               const isSelected = String(s._id) === String(currentTenantId || currentShop?._id);
+              const branchList = sortBranchesWithLpuFirst(s.branches);
               return (
                 <TouchableOpacity
                   key={s._id}
@@ -725,8 +727,8 @@ export const CustomerProfileScreen = ({ onNavigateToOrders }: { onNavigateToOrde
                 >
                   <View style={{ flex: 1, marginRight: 10 }}>
                     <Text style={{ fontSize: 15, fontWeight: '900', color: COLORS.black, textTransform: 'uppercase' }}>{s.name}</Text>
-                    {Boolean(s.branches && s.branches.length > 0) && (
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569', marginTop: 2 }}>{s.branches.join(', ')}</Text>
+                    {Boolean(branchList && branchList.length > 0) && (
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569', marginTop: 2 }}>{branchList.join(', ')}</Text>
                     )}
                   </View>
                   {isSelected && (

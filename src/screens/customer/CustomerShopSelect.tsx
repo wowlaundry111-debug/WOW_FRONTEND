@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapPin, Building, ChevronRight, Store } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 import { useAppStore } from '../../store/useAppStore';
+import { sortShopsWithLpuFirst, sortBranchesWithLpuFirst } from '../../utils/branchHelper';
 
 interface CustomerShopSelectProps {
   onShopSelect: (shopId: string) => void;
@@ -12,6 +13,7 @@ interface CustomerShopSelectProps {
 export const CustomerShopSelectScreen: React.FC<CustomerShopSelectProps> = ({ onShopSelect }) => {
   const insets = useSafeAreaInsets();
   const { shops, currentUser } = useAppStore();
+  const sortedShops = sortShopsWithLpuFirst(shops);
 
   return (
     <View style={styles.root}>
@@ -31,8 +33,9 @@ export const CustomerShopSelectScreen: React.FC<CustomerShopSelectProps> = ({ on
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {shops.map((shop) => {
+        {sortedShops.map((shop) => {
           const isOpen = shop.isOpen ?? true;
+          const branchList = sortBranchesWithLpuFirst(shop.branches);
           return (
             <TouchableOpacity
               key={shop._id}
@@ -64,11 +67,11 @@ export const CustomerShopSelectScreen: React.FC<CustomerShopSelectProps> = ({ on
                   </View>
                 </View>
 
-                {shop.branches && shop.branches.length > 0 && (
+                {branchList && branchList.length > 0 && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                     <MapPin size={13} color="#4B5563" />
                     <Text style={styles.branchText} numberOfLines={1}>
-                      {shop.branches.join(' · ')}
+                      {branchList.join(' · ')}
                     </Text>
                   </View>
                 )}

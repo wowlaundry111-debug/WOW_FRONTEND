@@ -13,6 +13,7 @@ import { AdminShopScreen } from './AdminShop';
 import { SuperAdminDashboard } from './SuperAdminDashboard';
 import { useAppStore } from '../../store/useAppStore';
 import { AdminTab, COLORS, TYPO, SPACING, RADIUS } from '../../components/Theme';
+import { sortShopsWithLpuFirst } from '../../utils/branchHelper';
 
 export const AdminPortal: React.FC = () => {
   const { currentUser, shops, currentTenantId, orders, setCurrentTenantId } = useAppStore();
@@ -65,7 +66,7 @@ export const AdminPortal: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={[TYPO.headlineMd, { marginBottom: SPACING.md }]}>Switch Shop Context</Text>
-            {shops.map(s => (
+            {sortShopsWithLpuFirst(shops).map(s => (
               <TouchableOpacity
                 key={s._id}
                 style={[styles.shopSelectBtn, s._id === currentTenantId && styles.shopSelectBtnActive]}

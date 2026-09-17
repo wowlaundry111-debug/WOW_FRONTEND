@@ -5,6 +5,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Shop, User, Category, Item, Order, Offer, OrderStatus, PaymentStatus, PaymentMode, Role, OrderItem, CartItem } from '../types';
 import api, { setAuthToken, uploadImageToCloudinary } from '../services/api';
+import { sortShopsWithLpuFirst } from '../utils/branchHelper';
 
 interface AppState {
   // Auth Contexts
@@ -237,7 +238,8 @@ export const useAppStore = create<AppState>()(
         const isSuper = get().currentUser?.role === 'SuperAdmin';
 
         if (isShopsFresh && isOffersFresh) {
-          let activeShopId = isSuper ? get().currentTenantId : (get().currentTenantId || (shops[0]?._id || ''));
+          const sortedLocalShops = sortShopsWithLpuFirst(shops);
+          let activeShopId = isSuper ? get().currentTenantId : (get().currentTenantId || (sortedLocalShops[0]?._id || ''));
           if (!get().currentTenantId && activeShopId && !isSuper) {
             set({ currentTenantId: activeShopId });
           }
@@ -255,13 +257,14 @@ export const useAppStore = create<AppState>()(
         set({ isLoading: true, error: null });
         try {
           const fetchedShops = (await api.get('/catalog/shops')).data || [];
-          let activeShopId = isSuper ? get().currentTenantId : (get().currentTenantId || (fetchedShops[0]?._id || ''));
+          const sortedShops = sortShopsWithLpuFirst(fetchedShops);
+          let activeShopId = isSuper ? get().currentTenantId : (get().currentTenantId || (sortedShops[0]?._id || ''));
 
           const offersUrl = activeShopId ? `/catalog/offers?shopId=${activeShopId}` : '/catalog/offers';
           const offersRes = await api.get(offersUrl);
 
           set({
-            shops: fetchedShops,
+            shops: sortedShops,
             offers: offersRes.data || [],
             currentTenantId: isSuper ? get().currentTenantId : activeShopId,
             shopsLastFetched: Date.now(),
@@ -1225,7 +1228,7 @@ export const useAppStore = create<AppState>()(
           });
           newShop = shopRes.data as Shop;
           // Surgical: add new shop to local state
-          set(state => ({ shops: [...state.shops, newShop] }));
+          set(state => ({ shops: sortShopsWithLpuFirst([...state.shops, newShop]) }));
         } catch (err: any) {
           console.error('Failed to create shop:', err);
           throw new Error('Failed to create shop: ' + (err.response?.data?.error || err.message));
@@ -1296,8 +1299,9 @@ export const useAppStore = create<AppState>()(
         try {
           const res = await api.get('/catalog/shops/admin/all');
           if (Array.isArray(res.data)) {
-            set({ shops: res.data });
-            return res.data;
+            const sorted = sortShopsWithLpuFirst(res.data);
+            set({ shops: sorted });
+            return sorted;
           }
           return [];
         } catch (err) {

@@ -19,6 +19,7 @@ import { Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold
 import { useAppStore } from './src/store/useAppStore';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
 import { useNotificationStore } from './src/store/useNotificationStore';
+import { sortShopsWithLpuFirst } from './src/utils/branchHelper';
 import { SocketManager } from './src/components/SocketManager';
 import { AdminPortal } from './src/screens/admin/AdminPortal';
 import { CustomerPortal } from './src/screens/customer/CustomerPortal';
@@ -83,7 +84,7 @@ const SwitcherModal: React.FC<SwitcherModalProps> = ({ visible, onClose }) => {
         <Text style={[TYPO.labelSm, { color: COLORS.outline, textTransform: 'uppercase', marginTop: SPACING.md, marginBottom: SPACING.sm }]}>
           Active Tenant (Shop)
         </Text>
-        {shops.map((s) => (
+        {sortShopsWithLpuFirst(shops).map((s) => (
           <TouchableOpacity
             key={s._id}
             style={[styles.switcherRow, currentTenantId === s._id && { backgroundColor: `${COLORS.primary}12` }]}
