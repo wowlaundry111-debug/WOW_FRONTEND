@@ -12,6 +12,7 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import {
   User,
@@ -29,6 +30,7 @@ import {
   CreditCard,
   Sparkles,
   Package,
+  Scale,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
@@ -63,22 +65,244 @@ const FILTERS: {
   { key: 'history', label: 'History', statuses: ['DELIVERED'] },
 ];
 
+const isKgCheck = (it: any) =>
+  it?.unit === 'KG' ||
+  (typeof it?.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) ||
+  Boolean(it?.kgWeight && it.kgWeight > 0);
+
+interface WeighKgModalProps {
+  visible: boolean;
+  order: Order | null;
+  catalogItems: any[];
+  shops: any[];
+  onClose: () => void;
+  onConfirm: (weights: { itemId: string; kgWeight: number }[], markPickedUp?: boolean) => Promise<void>;
+}
+
+const WeighKgModal: React.FC<WeighKgModalProps> = ({
+  visible,
+  order,
+  catalogItems,
+  shops,
+  onClose,
+  onConfirm,
+}) => {
+  const [weights, setWeights] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (order) {
+      const initial: Record<string, string> = {};
+      (order.items || []).forEach((it) => {
+        if (isKgCheck(it)) {
+          initial[it.itemId] = (it.kgWeight !== undefined && it.kgWeight !== null && it.kgWeight > 0) ? String(it.kgWeight) : '1.0';
+        }
+      });
+      setWeights(initial);
+    }
+  }, [order]);
+
+  if (!order || !visible) return null;
+
+  const kgItems = (order.items || []).filter(isKgCheck);
+
+  const calculateLiveTotal = () => {
+    let sum = 0;
+    kgItems.forEach((it) => {
+      const catItem = (catalogItems || []).find((c) => String(c._id) === String(it.itemId) || c.name === it.name);
+      const rate = catItem?.pricePerKg || (it.unit === 'KG' && it.price > 0 && !it.kgWeight ? it.price : 0) || 60;
+      const w = parseFloat(weights[it.itemId] || '0') || 0;
+      sum += w * rate;
+    });
+    return sum;
+  };
+
+  const handleSave = async (andConfirmPickup = false) => {
+    setSubmitting(true);
+    const payload = kgItems.map((it) => ({
+      itemId: it.itemId,
+      kgWeight: parseFloat(weights[it.itemId] || '0') || 0,
+    }));
+    await onConfirm(payload, andConfirmPickup);
+    setSubmitting(false);
+    onClose();
+  };
+
+  const shop = (shops || []).find((s) => s._id === order.shopId);
+  const kgTotal = calculateLiveTotal();
+  const perItemSubtotal = (order.items || [])
+    .filter((it) => !isKgCheck(it))
+    .reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+  const itemSubtotal = kgTotal + perItemSubtotal;
+
+  let liveDiscount = Number(order.discountAmount) || 0;
+  if (order.couponCode) {
+    const discountPercent = Number(order.couponDiscountPercent) || (shop?.promoCode?.code?.toUpperCase() === order.couponCode?.toUpperCase() ? Number(shop.promoCode.discountPercent) : 0);
+    const maxDiscount = order.couponMaxDiscount !== undefined ? Number(order.couponMaxDiscount) : (shop?.promoCode?.maxDiscount !== undefined ? Number(shop.promoCode.maxDiscount) : Infinity);
+    const minOrder = Number(order.couponMinOrderValue) || Number(shop?.promoCode?.minOrderValue) || 0;
+
+    if (discountPercent > 0) {
+      if (itemSubtotal >= minOrder) {
+        liveDiscount = Math.min((itemSubtotal * discountPercent) / 100, maxDiscount);
+        liveDiscount = Math.round(liveDiscount * 100) / 100;
+      } else {
+        liveDiscount = 0;
+      }
+    }
+  }
+
+  const prefsTotal = (order.washPreferences && order.washPreferences.length > 0)
+    ? order.washPreferences.reduce((sum: number, p: any) => sum + (p.price || 0), 0)
+    : 0;
+  const taxPercent = shop?.taxPercent !== undefined ? Number(shop.taxPercent) : 0;
+  const taxAmt = Math.round((itemSubtotal * taxPercent / 100) * 100) / 100;
+  const deliveryAmt = order.deliveryFee !== undefined ? Number(order.deliveryFee) : Number(shop?.deliveryFee || 0);
+  const grandTotal = Math.max(0, Math.round((itemSubtotal + taxAmt + deliveryAmt - liveDiscount + prefsTotal) * 100) / 100);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.modalPreHeading}>ADMIN PICKUP & SCALE</Text>
+              <Text style={styles.modalHeading}>WEIGH & CALCULATE PRICE</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+              <X size={22} color={COLORS.black} strokeWidth={3} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 12, fontWeight: '700' }}>
+            Enter physical scale weight. Prices and totals recalculate live on your screen.
+          </Text>
+
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 260 }}>
+            {kgItems.map((it) => {
+              const catItem = (catalogItems || []).find((c) => String(c._id) === String(it.itemId) || c.name === it.name);
+              const rate = catItem?.pricePerKg || (it.unit === 'KG' && it.price > 0 && !it.kgWeight ? it.price : 0) || 60;
+              const w = parseFloat(weights[it.itemId] || '0') || 0;
+              const lineTotal = Math.round(w * rate * 100) / 100;
+
+              return (
+                <View key={it.itemId} style={styles.weighRowCard}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '900', color: COLORS.black }}>{it.name}</Text>
+                      {(it.categoryName || it.subCategoryName) && (
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B', marginTop: 1 }}>
+                          {it.categoryName}{it.subCategoryName ? ` › ${it.subCategoryName}` : ''}{it.isBucket ? ' • Bucket' : ''}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#0369A1' }}>₹{rate}/KG</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                    <View style={styles.weighStepperWrap}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const curr = parseFloat(weights[it.itemId] || '0') || 0;
+                          const next = Math.max(0, Math.round((curr - 0.5) * 10) / 10);
+                          setWeights((p) => ({ ...p, [it.itemId]: next.toFixed(1) }));
+                        }}
+                        style={styles.weighStepperBtn}
+                      >
+                        <Text style={styles.weighStepperBtnText}>-0.5</Text>
+                      </TouchableOpacity>
+                      <TextInput
+                        keyboardType="decimal-pad"
+                        style={styles.weighInput}
+                        value={weights[it.itemId] || '1.0'}
+                        onChangeText={(t) => setWeights((p) => ({ ...p, [it.itemId]: t }))}
+                      />
+                      <Text style={{ fontWeight: '800', fontSize: 12, color: '#6B7280' }}>KG</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const curr = parseFloat(weights[it.itemId] || '0') || 0;
+                          const next = Math.round((curr + 0.5) * 10) / 10;
+                          setWeights((p) => ({ ...p, [it.itemId]: next.toFixed(1) }));
+                        }}
+                        style={styles.weighStepperBtn}
+                      >
+                        <Text style={styles.weighStepperBtnText}>+0.5</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text style={{ fontSize: 15, fontWeight: '900', color: COLORS.black, marginLeft: 'auto' }}>
+                      = ₹{lineTotal}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+
+          {/* Live Recalculation Preview Card */}
+          <View style={styles.weighLiveCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#166534' }}>Weighed KG Subtotal:</Text>
+              <Text style={{ fontSize: 14, fontWeight: '900', color: '#166534' }}>+₹{Math.round(kgTotal * 100) / 100}</Text>
+            </View>
+            {perItemSubtotal > 0 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#374151' }}>Piece Items:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: '#374151' }}>₹{perItemSubtotal}</Text>
+              </View>
+            )}
+            {liveDiscount > 0 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>
+                  Promo ({order.couponCode || 'Coupon'}):
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '900', color: '#15803D' }}>-₹{liveDiscount}</Text>
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderColor: '#BBF7D0' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: COLORS.black }}>New Grand Total:</Text>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: '#0369A1' }}>₹{grandTotal}</Text>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+            <TouchableOpacity style={[styles.weighBtn, { backgroundColor: '#F3F4F6' }]} onPress={() => handleSave(false)} disabled={submitting}>
+              <Text style={[styles.weighBtnText, { color: COLORS.black }]}>SAVE WEIGHT</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.weighBtn, { backgroundColor: '#B0FF49', flex: 1.6 }]}
+              onPress={() => handleSave(true)}
+              disabled={submitting}
+            >
+              <Text style={[styles.weighBtnText, { color: COLORS.black }]}>
+                {submitting ? 'SAVING...' : 'SAVE & MARK PICKED UP'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 export const AdminOrdersScreen: React.FC = () => {
   const {
     orders,
     users,
     shops,
+    items,
     currentTenantId,
     currentUser,
     updateOrderStatus,
     assignDeliveryBoy,
     updateOrderAdminDetails,
+    updateKgWeight,
     fetchOrders,
   } = useAppStore();
 
   const [activeFilter, setActiveFilter] = useState<'new' | 'washing' | 'delivery' | 'history'>('new');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [assignModalOrder, setAssignModalOrder] = useState<Order | null>(null);
+  const [weighModalOrder, setWeighModalOrder] = useState<Order | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const [editPrice, setEditPrice] = useState('');
@@ -460,35 +684,77 @@ export const AdminOrdersScreen: React.FC = () => {
               {/* Action Buttons Row */}
               <View style={styles.cardActionsRow}>
                 {order.status === 'PLACED' && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.secondary }]}
-                    onPress={() => handleStatusChange(order._id, 'ACCEPTED')}
-                  >
-                    <Text style={styles.actionBtnText}>ACCEPT ORDER</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: COLORS.secondary, flex: 1 }]}
+                      onPress={() => handleStatusChange(order._id, 'ACCEPTED')}
+                    >
+                      <Text style={styles.actionBtnText}>ACCEPT ORDER</Text>
+                    </TouchableOpacity>
+                    {order.items?.some(isKgCheck) && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
+                        onPress={() => setWeighModalOrder(order)}
+                      >
+                        <Scale size={14} color={COLORS.black} />
+                        <Text style={[styles.actionBtnText, { color: COLORS.black }]}>WEIGH & PICK UP</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
 
                 {order.status === 'ACCEPTED' && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.primary }]}
-                    onPress={() => setAssignModalOrder(order)}
-                  >
-                    <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
-                      {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'ASSIGN PICKUP'}
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
+                    {order.items?.some(isKgCheck) && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
+                        onPress={() => setWeighModalOrder(order)}
+                      >
+                        <Scale size={14} color={COLORS.black} />
+                        <Text style={[styles.actionBtnText, { color: COLORS.black }]}>WEIGH & PICK UP</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
+                      onPress={() => setAssignModalOrder(order)}
+                    >
+                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                        {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'ASSIGN PICKUP'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
 
                 {order.status === 'PICKUP_ASSIGNED' && (
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]}
-                      onPress={() => handleStatusChange(order._id, 'PICKED_UP')}
-                    >
-                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
-                        MARK PICKED UP
-                      </Text>
-                    </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
+                    {order.items?.some(isKgCheck) && !order.kgPriceUpdated ? (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
+                        onPress={() => setWeighModalOrder(order)}
+                      >
+                        <Scale size={14} color={COLORS.black} />
+                        <Text style={[styles.actionBtnText, { color: COLORS.black }]}>
+                          WEIGH & PICK UP
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]}
+                        onPress={() => handleStatusChange(order._id, 'PICKED_UP')}
+                      >
+                        <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                          MARK PICKED UP
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {order.items?.some(isKgCheck) && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: '#FEF08A', paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center' }]}
+                        onPress={() => setWeighModalOrder(order)}
+                      >
+                        <Scale size={14} color={COLORS.black} />
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                       style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
                       onPress={() => setAssignModalOrder(order)}
@@ -608,11 +874,22 @@ export const AdminOrdersScreen: React.FC = () => {
                           ITEMS TO PROCESS ({selectedOrder.items?.length || 0})
                         </Text>
                       </View>
-                      {selectedOrder.items?.some((it: any) => it.unit === 'KG') && (
-                        <View style={[styles.kgStatusPill, { backgroundColor: selectedOrder.kgPriceUpdated ? '#9AE600' : '#FEF08A' }]}>
-                          <Text style={styles.kgStatusPillText}>
-                            {selectedOrder.kgPriceUpdated ? 'KG WEIGHED' : 'KG PENDING'}
-                          </Text>
+                      {selectedOrder.items?.some((it: any) => isKgCheck(it)) && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={[styles.kgStatusPill, { backgroundColor: selectedOrder.kgPriceUpdated ? '#9AE600' : '#FEF08A' }]}>
+                            <Text style={styles.kgStatusPillText}>
+                              {selectedOrder.kgPriceUpdated ? 'KG WEIGHED' : 'KG PENDING'}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => setWeighModalOrder(selectedOrder)}
+                            style={{ backgroundColor: '#9AE600', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          >
+                            <Scale size={11} color={COLORS.black} />
+                            <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>
+                              {selectedOrder.kgPriceUpdated ? 'EDIT' : 'WEIGH'}
+                            </Text>
+                          </TouchableOpacity>
                         </View>
                       )}
                     </View>
@@ -867,6 +1144,48 @@ export const AdminOrdersScreen: React.FC = () => {
                         </View>
                       </View>
 
+                      {/* Direct Admin Pickup Quick Action */}
+                      {['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED'].includes(selectedOrder.status) && (
+                        <View style={[styles.detailBox, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <View>
+                              <Text style={[styles.detailBoxLabel, { color: '#166534' }]}>SHOP COUNTER PICKUP</Text>
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.black }}>
+                                Direct Handover & Pickup
+                              </Text>
+                            </View>
+                          </View>
+                          {selectedOrder.items?.some(isKgCheck) ? (
+                            <TouchableOpacity
+                              style={[styles.actionBtn, { backgroundColor: '#B0FF49', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
+                              onPress={() => {
+                                const o = selectedOrder;
+                                setSelectedOrder(null);
+                                setWeighModalOrder(o);
+                              }}
+                            >
+                              <Scale size={16} color={COLORS.black} />
+                              <Text style={[styles.actionBtnText, { color: COLORS.black }]}>
+                                WEIGH & MARK PICKED UP
+                              </Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              style={[styles.actionBtn, { backgroundColor: '#10B981', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
+                              onPress={() => {
+                                handleStatusChange(selectedOrder._id, 'PICKED_UP');
+                                setSelectedOrder(null);
+                              }}
+                            >
+                              <CheckCircle size={16} color={COLORS.white} />
+                              <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                                MARK PICKED UP (TO WASH)
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+
                       {/* Admin Editable Overrides */}
                       <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>OVERRIDE TOTAL AMOUNT (₹)</Text>
@@ -946,6 +1265,28 @@ export const AdminOrdersScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+      {/* Weigh KG Modal (Admin Pickup / Scale Measurement) */}
+      <WeighKgModal
+        visible={!!weighModalOrder}
+        order={weighModalOrder}
+        catalogItems={items}
+        shops={shops}
+        onClose={() => setWeighModalOrder(null)}
+        onConfirm={async (weights, markPickedUp = false) => {
+          if (!weighModalOrder) return;
+          const res = await updateKgWeight(weighModalOrder._id, weights, markPickedUp);
+          if (res?.success) {
+            Alert.alert(
+              'Success',
+              markPickedUp
+                ? 'Garments weighed, final price calculated, and order marked as Picked Up!'
+                : 'Garment weights updated and bill recalculated successfully!'
+            );
+          } else if (res?.message) {
+            Alert.alert('Error', res.message);
+          }
+        }}
+      />
     </View>
   );
 };
@@ -1730,5 +2071,65 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  weighRowCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.md,
+    padding: 10,
+    marginBottom: 8,
+  },
+  weighStepperWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.sm,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  weighStepperBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#F3F4F6',
+  },
+  weighStepperBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.black,
+  },
+  weighInput: {
+    width: 48,
+    textAlign: 'center',
+    fontWeight: '900',
+    fontSize: 14,
+    color: COLORS.black,
+    paddingVertical: 4,
+  },
+  weighLiveCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    borderRadius: RADIUS.md,
+    padding: 10,
+    gap: 4,
+    marginTop: 8,
+  },
+  weighBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...NEO_SHADOW.box2,
+  },
+  weighBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    letterSpacing: 0.5,
   },
 });
