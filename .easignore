@@ -32,6 +32,7 @@ assets/transparent_assets/
 # Firebase / credentials
 firebase-service-account.json
 google-services.json
+!apps/partner/google-services.json
 GoogleService-Info.plist
 
 # TypeScript

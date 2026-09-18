@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "WoW Partner",
-    "slug": "Frontend",
+    "slug": "wow-partner",
+    "scheme": "wowlaundrypartner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/iconic.png",
@@ -31,7 +32,9 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -62,7 +65,7 @@
     "owner": "wow_laundry",
     "extra": {
       "eas": {
-        "projectId": "f146fe1a-3e90-4af0-9562-6feb058485b4"
+        "projectId": "e0b97dab-69a0-4b1f-8a27-f0f2476fcc17"
       }
     }
   }

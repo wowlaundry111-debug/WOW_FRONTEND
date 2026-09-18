@@ -63,6 +63,8 @@ export interface Shop {
   minOrderValue?: number;
   taxPercent?: number;
   deliveryFee?: number;
+  androidAppUrl?: string;
+  iosAppUrl?: string;
   createdAt: string;
 }
 

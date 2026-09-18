@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
@@ -20,7 +21,7 @@ import {
   Outfit_700Bold,
   Outfit_800ExtraBold,
 } from '@expo-google-fonts/outfit';
-import { ShieldAlert, LogOut } from 'lucide-react-native';
+import { ShieldAlert, LogOut, Download, ArrowRight, Store } from 'lucide-react-native';
 
 import { useAppStore } from './src/store/useAppStore';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
@@ -33,7 +34,8 @@ import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from './src/components/Them
 
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
-  const { currentUser, currentRole, initializeAppData, setCurrentUser, isLoading } = useAppStore();
+  const [allowCustomerMode, setAllowCustomerMode] = useState(false);
+  const { currentUser, currentRole, initializeAppData, setCurrentUser, isLoading, shops } = useAppStore();
 
   usePushNotifications();
 
@@ -57,7 +59,23 @@ export default function App() {
   }
 
   // Guard for non-customer accounts logged into the customer app
-  const isStaffAccount = currentUser && ['ShopAdmin', 'SuperAdmin', 'Delivery', 'Operator'].includes(currentUser.role);
+  const isStaffAccount = currentUser && ['ShopAdmin', 'SuperAdmin', 'Delivery', 'Operator'].includes(currentUser.role) && !allowCustomerMode;
+
+  const handleOpenPartnerApp = async () => {
+    // Attempt to open native partner app scheme or direct APK download
+    const activeShop = shops.find((s) => s.androidAppUrl) || shops[0];
+    const downloadUrl = activeShop?.androidAppUrl || 'https://wowlaundry.in';
+    try {
+      const canOpen = await Linking.canOpenURL('wowlaundrypartner://');
+      if (canOpen) {
+        await Linking.openURL('wowlaundrypartner://');
+      } else {
+        await Linking.openURL(downloadUrl);
+      }
+    } catch {
+      Linking.openURL(downloadUrl);
+    }
+  };
 
   return (
     <SafeAreaProvider>
@@ -75,18 +93,42 @@ export default function App() {
               </View>
               <Text style={styles.staffNoticeTitle}>STAFF ACCOUNT DETECTED</Text>
               <Text style={styles.staffNoticeSubtitle}>
-                You are currently signed in as a <Text style={{ fontWeight: '800' }}>{currentUser.role}</Text>.
+                You are currently signed in as a <Text style={{ fontWeight: '800', color: COLORS.black }}>{currentUser.role}</Text>.
                 {'\n\n'}
-                This application is strictly for Customers. Please use the <Text style={{ fontWeight: '800', color: COLORS.primary }}>WoW Partner App</Text> to manage orders, catalog, deliveries, and wash floors.
+                This application is the <Text style={{ fontWeight: '800' }}>WoW Laundry Customer App</Text>. For managing orders, wash floors, catalog, and deliveries, please use the dedicated <Text style={{ fontWeight: '800', color: COLORS.primary }}>WoW Partner App</Text>.
               </Text>
-              <TouchableOpacity
-                style={styles.logoutBtn}
-                onPress={() => setCurrentUser(null)}
-                activeOpacity={0.85}
-              >
-                <LogOut size={20} color={COLORS.white} />
-                <Text style={styles.logoutBtnText}>LOG OUT & SWITCH</Text>
-              </TouchableOpacity>
+
+              <View style={styles.actionButtonGroup}>
+                <TouchableOpacity
+                  style={styles.downloadPartnerBtn}
+                  onPress={handleOpenPartnerApp}
+                  activeOpacity={0.85}
+                >
+                  <Store size={18} color={COLORS.black} />
+                  <Text style={styles.downloadPartnerBtnText}>OPEN / GET PARTNER APP</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.continueCustomerBtn}
+                  onPress={() => setAllowCustomerMode(true)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.continueCustomerBtnText}>Continue as Customer</Text>
+                  <ArrowRight size={16} color={COLORS.primary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.logoutBtn}
+                  onPress={() => {
+                    setAllowCustomerMode(false);
+                    setCurrentUser(null);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <LogOut size={16} color={COLORS.white} />
+                  <Text style={styles.logoutBtnText}>LOG OUT & SWITCH</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         ) : (
@@ -150,15 +192,62 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
-  logoutBtn: {
+  actionButtonGroup: {
+    width: '100%',
+    gap: 10,
+    alignItems: 'center',
+  },
+  downloadPartnerBtn: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: COLORS.secondary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    ...NEO_SHADOW.box4,
+  },
+  downloadPartnerBtnText: {
+    color: COLORS.black,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  continueCustomerBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+  },
+  continueCustomerBtnText: {
+    color: COLORS.black,
+    fontWeight: '700',
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 13,
+  },
+  logoutBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     backgroundColor: COLORS.black,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: RADIUS.md,
     borderWidth: 2,
     borderColor: COLORS.black,
@@ -168,7 +257,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '800',
     fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 14,
+    fontSize: 13,
     letterSpacing: 0.5,
   },
 });
