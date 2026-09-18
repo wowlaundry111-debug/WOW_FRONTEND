@@ -29,6 +29,8 @@ import {
   Tag,
   Percent,
   X,
+  Check,
+  ShieldCheck,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
@@ -678,16 +680,22 @@ export const AdminShopScreen: React.FC = () => {
                           style={[
                             styles.presetPill,
                             isAlreadyAdded && styles.presetPillDisabled,
+                            { flexDirection: 'row', alignItems: 'center', gap: 4 },
                           ]}
                           activeOpacity={0.8}
                         >
+                          {isAlreadyAdded ? (
+                            <Check size={11} color="#94A3B8" strokeWidth={3} />
+                          ) : (
+                            <Plus size={11} color={COLORS.black} strokeWidth={3} />
+                          )}
                           <Text
                             style={[
                               styles.presetPillText,
                               isAlreadyAdded && styles.presetPillTextDisabled,
                             ]}
                           >
-                            {isAlreadyAdded ? `✓ ${slot}` : `+ ${slot}`}
+                            {slot}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -1202,9 +1210,10 @@ export const AdminShopScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.passwordlessBanner}>
+                  <View style={[styles.passwordlessBanner, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                    <ShieldCheck size={14} color="#0D8DE3" strokeWidth={2.5} />
                     <Text style={styles.passwordlessBannerText}>
-                      ✓ Passwordless Staff: No password needed. Staff logs in securely via phone/email OTP.
+                      Passwordless Staff: No password needed. Staff logs in securely via phone/email OTP.
                     </Text>
                   </View>
 

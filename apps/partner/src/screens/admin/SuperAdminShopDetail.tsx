@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { ArrowLeft, Trash2, Truck, User, Sparkles, Plus } from 'lucide-react-native';
+import { ArrowLeft, Trash2, Truck, User, Sparkles, Plus, ShieldCheck } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -211,9 +211,10 @@ export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.staffNoteBox}>
+              <View style={[styles.staffNoteBox, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                <ShieldCheck size={14} color="#0D8DE3" strokeWidth={2.5} />
                 <Text style={styles.staffNoteText}>
-                  ✓ No password needed. Staff members sign in passwordless via email/phone OTP.
+                  No password needed. Staff members sign in passwordless via email/phone OTP.
                 </Text>
               </View>
 

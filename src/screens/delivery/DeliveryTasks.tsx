@@ -962,7 +962,7 @@ export const DeliveryTasksScreen = () => {
                     >
                       <Scale size={14} color={COLORS.black} strokeWidth={2.5} />
                       <Text style={{ fontSize: 12, fontWeight: '900', color: COLORS.black }}>
-                        {order.kgPriceUpdated ? `✓ WEIGHED AT PICKUP: ₹${order.totalAmount} (EDIT)` : 'WEIGH CLOTHES AT PICKUP (REQUIRED)'}
+                        {order.kgPriceUpdated ? `WEIGHED AT PICKUP: ₹${order.totalAmount} (EDIT)` : 'WEIGH CLOTHES AT PICKUP (REQUIRED)'}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -984,9 +984,12 @@ export const DeliveryTasksScreen = () => {
                       justifyContent: 'space-between',
                     }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#166534' }}>
-                      ✓ WEIGHED AT PICKUP
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <CheckCircle2 size={13} color="#166534" strokeWidth={2.5} />
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#166534' }}>
+                        WEIGHED AT PICKUP
+                      </Text>
+                    </View>
                     <Text style={{ fontSize: 12, fontWeight: '900', color: '#166534' }}>
                       FINAL BILL: ₹{order.totalAmount}
                     </Text>
