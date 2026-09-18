@@ -30,7 +30,9 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -58,10 +60,10 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "wow_laundry",
+    "owner": "wowlaundry",
     "extra": {
       "eas": {
-        "projectId": "f146fe1a-3e90-4af0-9562-6feb058485b4"
+        "projectId": "8813961e-0829-4933-bbec-4f1d58b2f52c"
       }
     }
   }
