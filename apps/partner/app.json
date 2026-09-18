@@ -62,10 +62,10 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "wow_laundry",
+    "owner": "wowlaundry",
     "extra": {
       "eas": {
-        "projectId": "e0b97dab-69a0-4b1f-8a27-f0f2476fcc17"
+        "projectId": "baf0aeae-04f2-4eed-9265-1d887e62f906"
       }
     }
   }
