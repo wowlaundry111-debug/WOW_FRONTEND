@@ -32,6 +32,9 @@ import {
   Layers,
   ArrowRight,
   Filter,
+  LogOut,
+  Phone,
+  FileText,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -46,6 +49,7 @@ export const OperatorPortal: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {
     currentUser,
+    setCurrentUser,
     orders,
     shops,
     updateOrderStatus,
@@ -67,6 +71,23 @@ export const OperatorPortal: React.FC = () => {
   const isSuperAdmin = currentUser?.role === 'SuperAdmin';
   const effectiveShopId = isSuperAdmin ? currentTenantId : (currentUser?.shopId || currentTenantId || shops[0]?._id);
   const currentShop = shops.find(s => s._id === effectiveShopId) || shops[0];
+
+  const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to log out of the operator console?')) {
+        setCurrentUser(null);
+      }
+    } else {
+      Alert.alert('Operator Logout', 'Are you sure you want to log out of the operator console?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: () => setCurrentUser(null),
+        },
+      ]);
+    }
+  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -250,6 +271,17 @@ export const OperatorPortal: React.FC = () => {
               )}
             </View>
           )}
+
+          {Boolean(item.instructions || item.adminNotes || (item.washPreferences && item.washPreferences.length > 0)) && (
+            <View style={styles.cardNoticeRow}>
+              <Sparkles size={12} color="#7C3AED" />
+              <Text style={styles.cardNoticeText} numberOfLines={1}>
+                {(item.instructions || item.adminNotes)
+                  ? `Note: ${item.instructions || item.adminNotes}`
+                  : `${item.washPreferences?.length} wash preference${(item.washPreferences?.length || 0) > 1 ? 's' : ''}`}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Action Progression Button */}
@@ -324,7 +356,17 @@ export const OperatorPortal: React.FC = () => {
       {/* Top Bar */}
       <View style={styles.topBar}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.topBarSub}>WASH FLOOR CONSOLE</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <Text style={styles.topBarSub}>WASH FLOOR CONSOLE</Text>
+            {Boolean(currentUser?.name) && (
+              <View style={styles.operatorPill}>
+                <Sparkles size={10} color="#7C3AED" strokeWidth={2.5} />
+                <Text style={styles.operatorPillText} numberOfLines={1}>
+                  {currentUser?.name}
+                </Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity
             onPress={() => (isSuperAdmin ? setShowShopSwitcher(true) : null)}
             activeOpacity={isSuperAdmin ? 0.7 : 1}
@@ -337,9 +379,14 @@ export const OperatorPortal: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh} activeOpacity={0.8}>
-          <RefreshCw size={18} color={COLORS.black} />
-        </TouchableOpacity>
+        <View style={styles.topBarActions}>
+          <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh} activeOpacity={0.8}>
+            <RefreshCw size={17} color={COLORS.black} strokeWidth={2.5} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutTopBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <LogOut size={16} color="#DC2626" strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search Input */}
@@ -446,6 +493,35 @@ export const OperatorPortal: React.FC = () => {
             </View>
 
             <ScrollView style={styles.modalBody}>
+              {/* Customer Contact & Pickup Slot */}
+              <View style={styles.modalMetaRow}>
+                {Boolean(selectedOrder?.customerPhone) && (
+                  <View style={styles.modalMetaPill}>
+                    <Phone size={12} color="#475569" strokeWidth={2.5} />
+                    <Text style={styles.modalMetaPillText}>{selectedOrder?.customerPhone}</Text>
+                  </View>
+                )}
+                {Boolean(selectedOrder?.pickupTime) && (
+                  <View style={styles.modalMetaPill}>
+                    <Clock size={12} color="#475569" strokeWidth={2.5} />
+                    <Text style={styles.modalMetaPillText}>{selectedOrder?.pickupTime}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Customer Wash Instructions */}
+              {Boolean(selectedOrder?.instructions || selectedOrder?.adminNotes) && (
+                <View style={styles.instructionCard}>
+                  <View style={styles.instructionCardHeader}>
+                    <FileText size={14} color="#B45309" strokeWidth={2.5} />
+                    <Text style={styles.instructionCardTitle}>CUSTOMER SPECIAL INSTRUCTIONS</Text>
+                  </View>
+                  <Text style={styles.instructionCardText}>
+                    {selectedOrder?.instructions || selectedOrder?.adminNotes}
+                  </Text>
+                </View>
+              )}
+
               <Text style={styles.modalSecTitle}>ITEMS LIST</Text>
               {selectedOrder?.items?.map((item, idx) => (
                 <View key={idx} style={styles.modalItemRow}>
@@ -454,7 +530,7 @@ export const OperatorPortal: React.FC = () => {
                     <Text style={styles.modalItemName}>{item.name}</Text>
                     {item.unit === 'KG' && (
                       <Text style={styles.modalItemSub}>
-                        {item.kgWeight ? `${item.kgWeight} KG weighed` : 'Per-KG item'}
+                        {item.kgWeight ? `${item.kgWeight} KG weighed` : 'Per-KG item (requires weighing)'}
                       </Text>
                     )}
                   </View>
@@ -476,6 +552,22 @@ export const OperatorPortal: React.FC = () => {
             </ScrollView>
 
             <View style={styles.modalFooter}>
+              {selectedOrder?.items?.some(i => i.unit === 'KG') && !selectedOrder?.kgPriceUpdated && (
+                <TouchableOpacity
+                  style={styles.modalWeighBtn}
+                  onPress={() => {
+                    const o = selectedOrder;
+                    setSelectedOrder(null);
+                    setWeightModalOrder(o);
+                    setInputWeight('');
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Scale size={16} color={COLORS.black} strokeWidth={2.5} />
+                  <Text style={styles.modalWeighBtnText}>WEIGH ORDER (KG)</Text>
+                </TouchableOpacity>
+              )}
+
               {selectedOrder && ['PICKED_UP', 'WASHING', 'IRONING'].includes(selectedOrder.status) && (
                 <TouchableOpacity
                   style={[styles.modalActionBtn, { backgroundColor: COLORS.black }]}
@@ -483,6 +575,7 @@ export const OperatorPortal: React.FC = () => {
                     const orderToAdvance = selectedOrder;
                     handleAdvanceStatus(orderToAdvance);
                   }}
+                  activeOpacity={0.85}
                 >
                   <Text style={styles.modalActionBtnText}>ADVANCE WASH STATUS</Text>
                   <ArrowRight size={18} color={COLORS.white} />
@@ -598,6 +691,28 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_800ExtraBold',
     color: COLORS.black,
   },
+  operatorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EDE9FE',
+    borderWidth: 1,
+    borderColor: '#7C3AED',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: RADIUS.sm,
+  },
+  operatorPillText: {
+    fontSize: 9,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#6D28D9',
+    letterSpacing: 0.3,
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   refreshBtn: {
     width: 40,
     height: 40,
@@ -605,6 +720,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.black,
     backgroundColor: COLORS.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...NEO_SHADOW.box2,
+  },
+  logoutTopBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    backgroundColor: '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
     ...NEO_SHADOW.box2,
@@ -743,6 +869,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontFamily: 'Outfit_800ExtraBold',
   },
+  cardNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FAF5FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: RADIUS.md,
+    marginTop: 6,
+  },
+  cardNoticeText: {
+    fontSize: 11,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#7C3AED',
+    flex: 1,
+  },
   cardFooter: {
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
@@ -847,6 +991,53 @@ const styles = StyleSheet.create({
   modalBody: {
     marginVertical: SPACING.md,
   },
+  modalMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  modalMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+  },
+  modalMetaPillText: {
+    fontSize: 11,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#475569',
+  },
+  instructionCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    borderRadius: RADIUS.md,
+    padding: 10,
+    marginBottom: 14,
+  },
+  instructionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  instructionCardTitle: {
+    fontSize: 10,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#B45309',
+    letterSpacing: 0.5,
+  },
+  instructionCardText: {
+    fontSize: 13,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#92400E',
+    lineHeight: 18,
+  },
   modalSecTitle: {
     fontSize: 11,
     fontWeight: '800',
@@ -897,6 +1088,26 @@ const styles = StyleSheet.create({
   },
   modalFooter: {
     paddingTop: SPACING.md,
+  },
+  modalWeighBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    backgroundColor: COLORS.secondary,
+    marginBottom: 8,
+    ...NEO_SHADOW.box2,
+  },
+  modalWeighBtnText: {
+    color: COLORS.black,
+    fontSize: 13,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    letterSpacing: 0.5,
   },
   modalActionBtn: {
     flexDirection: 'row',

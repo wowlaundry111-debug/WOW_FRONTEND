@@ -97,6 +97,7 @@ interface AppState {
   fetchAdminShop: (shopId: string) => Promise<Shop | null>;
   fetchAdminShops: () => Promise<Shop[]>;
   addDeliveryBoy: (email: string, targetShopId?: string, name?: string, phone?: string) => Promise<any>;
+  addOperator: (email: string, targetShopId?: string, name?: string, phone?: string) => Promise<any>;
   updateUser: (userId: string, data: Partial<User>) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   toggleUserSuspension: (userId: string) => Promise<void>;
@@ -1357,6 +1358,37 @@ export const useAppStore = create<AppState>()(
           return res.data;
         } catch (err: any) {
           console.error('Failed to add delivery boy:', err);
+          throw err;
+        }
+      },
+
+      addOperator: async (email, targetShopId, name, phone) => {
+        const shopId = targetShopId || get().currentTenantId || (get().currentUser?.shopId);
+        if (!shopId) {
+          throw new Error('Please select a shop branch first.');
+        }
+        try {
+          const derivedName = name || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Laundry Operator';
+          const res = await api.post('/auth/users', {
+            name: derivedName,
+            email: email.trim().toLowerCase(),
+            phone: phone || undefined,
+            role: 'Operator',
+            shopId,
+            address: 'Laundry Floor',
+          });
+          set(state => {
+            const exists = state.users.some(u => u._id === res.data._id || u.email.toLowerCase() === res.data.email.toLowerCase());
+            return {
+              users: exists
+                ? state.users.map(u => (u._id === res.data._id || u.email.toLowerCase() === res.data.email.toLowerCase()) ? res.data : u)
+                : [...state.users, res.data]
+            };
+          });
+          get().fetchUsers();
+          return res.data;
+        } catch (err: any) {
+          console.error('Failed to add operator:', err);
           throw err;
         }
       },

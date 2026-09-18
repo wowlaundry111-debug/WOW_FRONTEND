@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { ArrowLeft, Trash2, Truck, User } from 'lucide-react-native';
+import { ArrowLeft, Trash2, Truck, User, Sparkles, Plus } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
-  const { shops, users, orders, updateShop, deleteUser } = useAppStore();
+  const { shops, users, orders, updateShop, deleteUser, addDeliveryBoy, addOperator } = useAppStore();
   const shop = shops.find((s) => s._id === shopId);
 
   const [activeTab, setActiveTab] = useState<'details' | 'staff' | 'orders'>('details');
@@ -22,12 +22,43 @@ export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
   const [bankName, setBankName] = useState(shop?.paymentInfo?.bankName || '');
   const [accountNo, setAccountNo] = useState(shop?.paymentInfo?.accountNo || '');
 
+  // Add Branch Staff State (No password required)
+  const [newStaffRole, setNewStaffRole] = useState<'Operator' | 'Delivery'>('Operator');
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffPhone, setNewStaffPhone] = useState('');
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [isAddingStaff, setIsAddingStaff] = useState(false);
+
   if (!shop) return null;
 
   const shopOrders = orders.filter((o) => o.shopId === shopId);
   const shopStaff = users.filter(
-    (u) => u.shopId === shopId && ['ShopAdmin', 'Delivery'].includes(u.role)
+    (u) => u.shopId === shopId && ['ShopAdmin', 'Delivery', 'Operator'].includes(u.role)
   );
+
+  const handleAddBranchStaff = async () => {
+    if (!newStaffEmail || !newStaffEmail.includes('@')) {
+      Alert.alert('Required', 'Please enter a valid email address');
+      return;
+    }
+    setIsAddingStaff(true);
+    try {
+      if (newStaffRole === 'Operator') {
+        await addOperator(newStaffEmail.trim(), shopId, newStaffName.trim(), newStaffPhone.trim());
+        Alert.alert('Success', 'Wash Operator added to branch successfully!');
+      } else {
+        await addDeliveryBoy(newStaffEmail.trim(), shopId, newStaffName.trim(), newStaffPhone.trim());
+        Alert.alert('Success', 'Delivery staff added to branch successfully!');
+      }
+      setNewStaffName('');
+      setNewStaffPhone('');
+      setNewStaffEmail('');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to add staff member');
+    } finally {
+      setIsAddingStaff(false);
+    }
+  };
 
   const handleSaveShop = async () => {
     try {
@@ -126,40 +157,194 @@ export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
         )}
 
         {activeTab === 'staff' && (
-          <View style={styles.card}>
-            <Text style={styles.cardHeading}>BRANCH STAFF ({shopStaff.length})</Text>
+          <View style={{ gap: SPACING.md }}>
+            {/* Add Staff Card */}
+            <View style={styles.card}>
+              <Text style={styles.cardHeading}>+ ADD BRANCH STAFF</Text>
 
-            {shopStaff.map((st) => (
-              <View key={st._id} style={styles.staffRow}>
-                <View style={styles.staffAvatar}>
-                  {st.role === 'Delivery' ? (
-                    <Truck size={18} color={COLORS.black} strokeWidth={2.5} />
-                  ) : (
-                    <User size={18} color={COLORS.black} strokeWidth={2.5} />
-                  )}
-                </View>
-
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.staffName}>{st.name}</Text>
-                  <Text style={styles.staffRole}>
-                    {st.role} · {st.phone || st.email}
+              {/* Role Toggle */}
+              <View style={styles.roleToggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleToggleBtn,
+                    newStaffRole === 'Operator' && styles.roleToggleBtnActiveOperator,
+                  ]}
+                  onPress={() => setNewStaffRole('Operator')}
+                  activeOpacity={0.85}
+                >
+                  <Sparkles
+                    size={14}
+                    color={newStaffRole === 'Operator' ? COLORS.white : COLORS.black}
+                    strokeWidth={2.5}
+                  />
+                  <Text
+                    style={[
+                      styles.roleToggleBtnText,
+                      newStaffRole === 'Operator' && styles.roleToggleBtnTextActive,
+                    ]}
+                  >
+                    WASH OPERATOR
                   </Text>
-                </View>
+                </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.deleteStaffBtn}
-                  onPress={() => handleDeleteStaff(st._id, st.name)}
+                  style={[
+                    styles.roleToggleBtn,
+                    newStaffRole === 'Delivery' && styles.roleToggleBtnActiveDelivery,
+                  ]}
+                  onPress={() => setNewStaffRole('Delivery')}
+                  activeOpacity={0.85}
                 >
-                  <Trash2 size={16} color="#DC2626" strokeWidth={2.5} />
+                  <Truck
+                    size={14}
+                    color={newStaffRole === 'Delivery' ? COLORS.white : COLORS.black}
+                    strokeWidth={2.5}
+                  />
+                  <Text
+                    style={[
+                      styles.roleToggleBtnText,
+                      newStaffRole === 'Delivery' && styles.roleToggleBtnTextActive,
+                    ]}
+                  >
+                    DELIVERY FLEET
+                  </Text>
                 </TouchableOpacity>
               </View>
-            ))}
 
-            {shopStaff.length === 0 && (
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyText}>No staff registered under this branch.</Text>
+              <View style={styles.staffNoteBox}>
+                <Text style={styles.staffNoteText}>
+                  ✓ No password needed. Staff members sign in passwordless via email/phone OTP.
+                </Text>
               </View>
-            )}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>STAFF NAME</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder={newStaffRole === 'Operator' ? 'e.g. Ramesh Kumar' : 'e.g. Rahul Sharma'}
+                  placeholderTextColor="#9CA3AF"
+                  value={newStaffName}
+                  onChangeText={setNewStaffName}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>PHONE NUMBER</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="9876543210"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="phone-pad"
+                  value={newStaffPhone}
+                  onChangeText={setNewStaffPhone}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="staff@wow.com"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={newStaffEmail}
+                  onChangeText={setNewStaffEmail}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.addStaffBtn,
+                  newStaffRole === 'Operator' && { backgroundColor: '#8B5CF6' },
+                ]}
+                onPress={handleAddBranchStaff}
+                activeOpacity={0.85}
+                disabled={isAddingStaff}
+              >
+                <Plus
+                  size={16}
+                  color={newStaffRole === 'Operator' ? COLORS.white : COLORS.black}
+                  strokeWidth={3}
+                />
+                <Text
+                  style={[
+                    styles.addStaffBtnText,
+                    newStaffRole === 'Operator' && { color: COLORS.white },
+                  ]}
+                >
+                  {isAddingStaff
+                    ? 'ADDING...'
+                    : newStaffRole === 'Operator'
+                    ? 'ADD WASH OPERATOR'
+                    : 'ADD DELIVERY FLEET'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Staff List Card */}
+            <View style={styles.card}>
+              <Text style={styles.cardHeading}>BRANCH STAFF ({shopStaff.length})</Text>
+
+              {shopStaff.map((st) => (
+                <View key={st._id} style={styles.staffRow}>
+                  <View
+                    style={[
+                      styles.staffAvatar,
+                      st.role === 'Operator' && { backgroundColor: '#EDE9FE' },
+                      st.role === 'Delivery' && { backgroundColor: '#FFEDD5' },
+                    ]}
+                  >
+                    {st.role === 'Delivery' ? (
+                      <Truck size={18} color="#C2410C" strokeWidth={2.5} />
+                    ) : st.role === 'Operator' ? (
+                      <Sparkles size={18} color="#7C3AED" strokeWidth={2.5} />
+                    ) : (
+                      <User size={18} color={COLORS.black} strokeWidth={2.5} />
+                    )}
+                  </View>
+
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.staffName}>{st.name}</Text>
+                      <View
+                        style={[
+                          styles.roleBadge,
+                          st.role === 'Operator' && { backgroundColor: '#EDE9FE', borderColor: '#7C3AED' },
+                          st.role === 'Delivery' && { backgroundColor: '#FFEDD5', borderColor: '#EA580C' },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.roleBadgeText,
+                            st.role === 'Operator' && { color: '#6D28D9' },
+                            st.role === 'Delivery' && { color: '#C2410C' },
+                          ]}
+                        >
+                          {st.role.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.staffRole}>
+                      {st.phone || st.email}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.deleteStaffBtn}
+                    onPress={() => handleDeleteStaff(st._id, st.name)}
+                  >
+                    <Trash2 size={16} color="#DC2626" strokeWidth={2.5} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {shopStaff.length === 0 && (
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.emptyText}>No staff registered under this branch.</Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
@@ -308,6 +493,86 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_800ExtraBold',
     color: COLORS.white,
     letterSpacing: 0.8,
+  },
+  roleToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 8,
+  },
+  roleToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    backgroundColor: '#F8FAFC',
+  },
+  roleToggleBtnActiveOperator: {
+    backgroundColor: '#8B5CF6',
+    ...NEO_SHADOW.box2,
+  },
+  roleToggleBtnActiveDelivery: {
+    backgroundColor: '#FB923C',
+    ...NEO_SHADOW.box2,
+  },
+  roleToggleBtnText: {
+    fontSize: 10,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: COLORS.black,
+    letterSpacing: 0.3,
+  },
+  roleToggleBtnTextActive: {
+    color: COLORS.white,
+  },
+  staffNoteBox: {
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  staffNoteText: {
+    fontSize: 10,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#0369A1',
+    lineHeight: 14,
+  },
+  addStaffBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.secondary,
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.md,
+    paddingVertical: 11,
+    marginTop: 4,
+    ...NEO_SHADOW.box2,
+  },
+  addStaffBtnText: {
+    fontSize: 11,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: COLORS.black,
+    letterSpacing: 0.3,
+  },
+  roleBadge: {
+    borderWidth: 1,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  roleBadgeText: {
+    fontSize: 9,
+    fontFamily: 'Outfit_800ExtraBold',
+    letterSpacing: 0.3,
   },
   staffRow: {
     flexDirection: 'row',

@@ -164,6 +164,7 @@ export interface Order {
   deliveryAddress?: string;
   pickupTime?: string;
   adminNotes?: string;
+  instructions?: string;
   createdAt: string;
   updatedAt: string;
 }
