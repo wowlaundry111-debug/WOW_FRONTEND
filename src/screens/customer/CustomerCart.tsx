@@ -37,6 +37,8 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  Store,
+  Truck,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -697,7 +699,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
             <View style={[styles.sectionCard, { backgroundColor: '#FEF08A', borderColor: COLORS.black, borderWidth: 3 }]}>
               <View style={styles.cardHeaderRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={{ fontSize: 18 }}>🏬</Text>
+                  <Store size={18} color={COLORS.black} strokeWidth={2.5} />
                   <Text style={[styles.cardHeading, { color: COLORS.black }]}>WALK-IN CUSTOMER DETAILS</Text>
                 </View>
                 <View style={{ backgroundColor: COLORS.black, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
@@ -738,27 +740,29 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                   <TouchableOpacity
                     style={[
                       styles.tagPill,
-                      { flex: 1, height: 40 },
+                      { flex: 1, height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
                       walkInMode === 'BRANCH_PICKUP' && styles.tagPillActive,
                     ]}
                     onPress={() => setWalkInMode('BRANCH_PICKUP')}
                     activeOpacity={0.8}
                   >
+                    <Store size={14} color={walkInMode === 'BRANCH_PICKUP' ? COLORS.black : '#64748B'} strokeWidth={2.5} />
                     <Text style={[styles.tagPillText, walkInMode === 'BRANCH_PICKUP' && styles.tagPillTextActive]}>
-                      🏢 IN-STORE (₹0)
+                      IN-STORE (₹0)
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
                       styles.tagPill,
-                      { flex: 1, height: 40 },
+                      { flex: 1, height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
                       walkInMode === 'HOME_DELIVERY' && styles.tagPillActive,
                     ]}
                     onPress={() => setWalkInMode('HOME_DELIVERY')}
                     activeOpacity={0.8}
                   >
+                    <Truck size={14} color={walkInMode === 'HOME_DELIVERY' ? COLORS.black : '#64748B'} strokeWidth={2.5} />
                     <Text style={[styles.tagPillText, walkInMode === 'HOME_DELIVERY' && styles.tagPillTextActive]}>
-                      🚚 HOME DELIVERY
+                      HOME DELIVERY
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -795,9 +799,12 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
 
             {isStaffOrBranchAdmin && walkInMode === 'BRANCH_PICKUP' ? (
               <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.black }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.black }}>
-                  🏢 In-Store Branch Walk-in / Drop-off
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Store size={15} color="#0D8DE3" strokeWidth={2.5} />
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.black }}>
+                    In-Store Branch Walk-in / Drop-off
+                  </Text>
+                </View>
                 <Text style={{ fontSize: 11, color: '#4B5563', marginTop: 4, fontWeight: '700' }}>
                   Order dropped off at {shop?.name || 'the shop branch'}. Customer will collect from branch. No delivery fee applies.
                 </Text>
