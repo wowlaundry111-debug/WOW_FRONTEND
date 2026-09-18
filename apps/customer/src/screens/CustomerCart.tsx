@@ -250,12 +250,22 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
     (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg') || c.name.toLowerCase().includes('per-kg'))) || 
     Boolean(c.pricePerKg && c.pricePerKg > 0);
 
+  const isStaffOrBranchAdmin =
+    currentUser?.email?.toLowerCase().trim() === 'wowlaundry111@gmail.com' ||
+    currentUser?.role === 'SuperAdmin' ||
+    currentUser?.role === 'ShopAdmin';
+
+  const [walkInName, setWalkInName] = useState('');
+  const [walkInPhone, setWalkInPhone] = useState('');
+  const [walkInMode, setWalkInMode] = useState<'BRANCH_PICKUP' | 'HOME_DELIVERY'>('BRANCH_PICKUP');
+
   const hasKgItems = cart.some(isKgItem);
   const perItemSubtotal = cart.filter(c => !isKgItem(c)).reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
   const subtotal = perItemSubtotal;
   const taxPercent = shop?.taxPercent !== undefined ? Number(shop.taxPercent) : 5;
   const shopDeliveryFee = (shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0;
-  const deliveryFee = hasKgItems ? shopDeliveryFee : (subtotal > 500 ? 0 : shopDeliveryFee);
+  const isWalkIn = isStaffOrBranchAdmin && walkInMode === 'BRANCH_PICKUP';
+  const deliveryFee = isWalkIn ? 0 : (hasKgItems ? shopDeliveryFee : (subtotal > 500 ? 0 : shopDeliveryFee));
   const tax = (subtotal * taxPercent) / 100;
   const discount = activeCoupon
     ? Math.min((subtotal * activeCoupon.discountPercent) / 100, activeCoupon.maxDiscount)
@@ -288,6 +298,9 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   }, [currentUser]);
 
   const getComputedAddress = () => {
+    if (isStaffOrBranchAdmin && walkInMode === 'BRANCH_PICKUP') {
+      return `In-Store Branch Drop-off / Walk-in Counter (${shop?.name || 'Shop Branch'})`;
+    }
     const parts = [
       flatNo.trim() ? (flatNo.trim().toLowerCase().startsWith('flat') || flatNo.trim().toLowerCase().startsWith('house') ? flatNo.trim() : `Flat/House: ${flatNo.trim()}`) : '',
       area.trim() ? area.trim() : '',
@@ -512,13 +525,29 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
 
   const handlePlaceOrder = async () => {
     if (isClosed) {
-      alert('This laundry branch is currently closed and not accepting new orders.');
+      if (Platform.OS === 'web') alert('This laundry branch is currently closed and not accepting new orders.');
+      else Alert.alert('Branch Closed', 'This laundry branch is currently closed and not accepting new orders.');
       return;
+    }
+
+    if (isStaffOrBranchAdmin) {
+      if (!walkInName.trim()) {
+        if (Platform.OS === 'web') alert('Please enter walk-in customer name.');
+        else Alert.alert('Missing Name', 'Please enter the walk-in customer\'s full name.');
+        return;
+      }
+      const cleanPhone = walkInPhone.replace(/\D/g, '');
+      if (cleanPhone.length < 10) {
+        if (Platform.OS === 'web') alert('Please enter a valid 10-digit mobile number for the customer.');
+        else Alert.alert('Invalid Mobile', 'Please enter a valid 10-digit mobile number for the customer.');
+        return;
+      }
     }
 
     const finalAddress = getComputedAddress();
     if (!finalAddress.trim()) {
-      alert('Please enter your precise delivery address before proceeding.');
+      if (Platform.OS === 'web') alert('Please enter customer address before proceeding.');
+      else Alert.alert('Missing Address', 'Please enter customer address before proceeding.');
       return;
     }
 
@@ -526,14 +555,25 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     const mappedPrefs = activeWashPreferences.map((wp) => ({ name: wp.name, price: wp.price }));
     const pickupSlot = `${selectedDay} | ${selectedSlot}`;
-    const result = await placeOrder(finalAddress, pickupSlot, mappedPrefs);
+    const result = await placeOrder(
+      finalAddress,
+      pickupSlot,
+      mappedPrefs,
+      isStaffOrBranchAdmin ? {
+        name: walkInName.trim(),
+        phone: walkInPhone.replace(/\D/g, ''),
+        address: finalAddress,
+        isWalkIn: walkInMode === 'BRANCH_PICKUP',
+      } : undefined
+    );
     setLoading(false);
 
     if (result.success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onCheckoutSuccess();
     } else {
-      alert(result.message || 'Checkout failed');
+      if (Platform.OS === 'web') alert(result.message || 'Checkout failed');
+      else Alert.alert('Checkout Failed', result.message || 'Checkout failed');
     }
   };
 
@@ -652,80 +692,171 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
             </View>
           )}
 
+          {/* Staff Walk-In Order Details */}
+          {isStaffOrBranchAdmin && (
+            <View style={[styles.sectionCard, { backgroundColor: '#FEF08A', borderColor: COLORS.black, borderWidth: 3 }]}>
+              <View style={styles.cardHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 18 }}>🏬</Text>
+                  <Text style={[styles.cardHeading, { color: COLORS.black }]}>WALK-IN CUSTOMER DETAILS</Text>
+                </View>
+                <View style={{ backgroundColor: COLORS.black, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                  <Text style={{ color: '#FEF08A', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>BRANCH POS</Text>
+                </View>
+              </View>
+
+              {/* Customer Name */}
+              <View style={styles.cartInputGroup}>
+                <Text style={styles.cartInputLabel}>CUSTOMER FULL NAME *</Text>
+                <TextInput
+                  style={[styles.cartInput, { backgroundColor: COLORS.white }]}
+                  placeholder="e.g. Ramesh Kumar"
+                  placeholderTextColor="#9CA3AF"
+                  value={walkInName}
+                  onChangeText={setWalkInName}
+                />
+              </View>
+
+              {/* Customer Phone */}
+              <View style={styles.cartInputGroup}>
+                <Text style={styles.cartInputLabel}>CUSTOMER PHONE NUMBER (10 DIGITS) *</Text>
+                <TextInput
+                  style={[styles.cartInput, { backgroundColor: COLORS.white }]}
+                  placeholder="e.g. 9876543210"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={walkInPhone}
+                  onChangeText={(val) => setWalkInPhone(val.replace(/\D/g, ''))}
+                />
+              </View>
+
+              {/* Order Mode Switcher */}
+              <View style={{ marginTop: 4 }}>
+                <Text style={styles.cartInputLabel}>ORDER MODE</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.tagPill,
+                      { flex: 1, height: 40 },
+                      walkInMode === 'BRANCH_PICKUP' && styles.tagPillActive,
+                    ]}
+                    onPress={() => setWalkInMode('BRANCH_PICKUP')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.tagPillText, walkInMode === 'BRANCH_PICKUP' && styles.tagPillTextActive]}>
+                      🏢 IN-STORE (₹0)
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.tagPill,
+                      { flex: 1, height: 40 },
+                      walkInMode === 'HOME_DELIVERY' && styles.tagPillActive,
+                    ]}
+                    onPress={() => setWalkInMode('HOME_DELIVERY')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.tagPillText, walkInMode === 'HOME_DELIVERY' && styles.tagPillTextActive]}>
+                      🚚 HOME DELIVERY
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* 1. Precise Delivery Address Card */}
           <View style={styles.sectionCard}>
             <View style={styles.cardHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <MapPin size={18} color={COLORS.black} strokeWidth={2.5} />
-                <Text style={styles.cardHeading}>DELIVERY ADDRESS</Text>
+                <Text style={styles.cardHeading}>
+                  {isStaffOrBranchAdmin && walkInMode === 'BRANCH_PICKUP' ? 'BRANCH DROP-OFF' : 'DELIVERY ADDRESS'}
+                </Text>
               </View>
-              <BouncyCard
-                onPress={handleAutoDetect}
-                disabled={isDetectingLoc}
-                contentStyle={styles.detectBtn}
-              >
-                {isDetectingLoc ? (
-                  <ActivityIndicator size="small" color={COLORS.black} />
-                ) : (
-                  <>
-                    <Navigation size={12} color={COLORS.black} strokeWidth={2.5} />
-                    <Text style={styles.detectBtnText}>AUTODETECT</Text>
-                  </>
-                )}
-              </BouncyCard>
+              {(!isStaffOrBranchAdmin || walkInMode === 'HOME_DELIVERY') && (
+                <BouncyCard
+                  onPress={handleAutoDetect}
+                  disabled={isDetectingLoc}
+                  contentStyle={styles.detectBtn}
+                >
+                  {isDetectingLoc ? (
+                    <ActivityIndicator size="small" color={COLORS.black} />
+                  ) : (
+                    <>
+                      <Navigation size={12} color={COLORS.black} strokeWidth={2.5} />
+                      <Text style={styles.detectBtnText}>AUTODETECT</Text>
+                    </>
+                  )}
+                </BouncyCard>
+              )}
             </View>
 
-            {/* Address Tag Selector */}
-            <View style={styles.tagSelectorRow}>
-              {([
-                { tag: 'Home', label: 'HOME', icon: Home },
-                { tag: 'Work', label: 'WORK', icon: Briefcase },
-                { tag: 'Other', label: 'OTHER', icon: MapPin },
-              ] as const).map(({ tag, label, icon: IconComponent }) => {
-                const isSelected = addrTag === tag;
-                return (
-                  <BouncyCard
-                    key={tag}
-                    style={{ flex: 1 }}
-                    contentStyle={[styles.tagPill, isSelected && styles.tagPillActive]}
-                    onPress={() => setAddrTag(tag)}
-                  >
-                    <IconComponent
-                      size={12}
-                      color={isSelected ? COLORS.black : '#6B7280'}
-                      strokeWidth={2.5}
-                    />
-                    <Text style={[styles.tagPillText, isSelected && styles.tagPillTextActive]}>
-                      {label}
-                    </Text>
-                  </BouncyCard>
-                );
-              })}
-            </View>
+            {isStaffOrBranchAdmin && walkInMode === 'BRANCH_PICKUP' ? (
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.black }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.black }}>
+                  🏢 In-Store Branch Walk-in / Drop-off
+                </Text>
+                <Text style={{ fontSize: 11, color: '#4B5563', marginTop: 4, fontWeight: '700' }}>
+                  Order dropped off at {shop?.name || 'the shop branch'}. Customer will collect from branch. No delivery fee applies.
+                </Text>
+              </View>
+            ) : (
+              <>
+                {/* Address Tag Selector */}
+                <View style={styles.tagSelectorRow}>
+                  {([
+                    { tag: 'Home', label: 'HOME', icon: Home },
+                    { tag: 'Work', label: 'WORK', icon: Briefcase },
+                    { tag: 'Other', label: 'OTHER', icon: MapPin },
+                  ] as const).map(({ tag, label, icon: IconComponent }) => {
+                    const isSelected = addrTag === tag;
+                    return (
+                      <BouncyCard
+                        key={tag}
+                        style={{ flex: 1 }}
+                        contentStyle={[styles.tagPill, isSelected && styles.tagPillActive]}
+                        onPress={() => setAddrTag(tag)}
+                      >
+                        <IconComponent
+                          size={12}
+                          color={isSelected ? COLORS.black : '#6B7280'}
+                          strokeWidth={2.5}
+                        />
+                        <Text style={[styles.tagPillText, isSelected && styles.tagPillTextActive]}>
+                          {label}
+                        </Text>
+                      </BouncyCard>
+                    );
+                  })}
+                </View>
 
-            {/* Field 1: Flat / House No / Building */}
-            <View style={styles.cartInputGroup}>
-              <Text style={styles.cartInputLabel}>HOUSE / FLAT / BUILDING</Text>
-              <TextInput
-                style={styles.cartInput}
-                placeholder="e.g. Flat 402, Palm Heights"
-                placeholderTextColor="#9CA3AF"
-                value={flatNo}
-                onChangeText={setFlatNo}
-              />
-            </View>
+                {/* Field 1: Flat / House No / Building */}
+                <View style={styles.cartInputGroup}>
+                  <Text style={styles.cartInputLabel}>HOUSE / FLAT / BUILDING</Text>
+                  <TextInput
+                    style={styles.cartInput}
+                    placeholder="e.g. Flat 402, Palm Heights"
+                    placeholderTextColor="#9CA3AF"
+                    value={flatNo}
+                    onChangeText={setFlatNo}
+                  />
+                </View>
 
-            {/* Field 2: Area / Street / Landmark */}
-            <View style={[styles.cartInputGroup, { marginBottom: 0 }]}>
-              <Text style={styles.cartInputLabel}>AREA, STREET & CITY</Text>
-              <TextInput
-                style={styles.cartInput}
-                placeholder="e.g. 100ft Road, Near Metro, Indiranagar"
-                placeholderTextColor="#9CA3AF"
-                value={area}
-                onChangeText={setArea}
-              />
-            </View>
+                {/* Field 2: Area / Street / Landmark */}
+                <View style={[styles.cartInputGroup, { marginBottom: 0 }]}>
+                  <Text style={styles.cartInputLabel}>AREA, STREET & CITY</Text>
+                  <TextInput
+                    style={styles.cartInput}
+                    placeholder="e.g. 100ft Road, Near Metro, Indiranagar"
+                    placeholderTextColor="#9CA3AF"
+                    value={area}
+                    onChangeText={setArea}
+                  />
+                </View>
+              </>
+            )}
           </View>
 
           {/* 2. Pickup Slot Selector */}

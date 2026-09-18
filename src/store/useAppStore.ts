@@ -65,7 +65,12 @@ interface AppState {
   clearCart: () => void;
   applyCoupon: (code: string) => { success: boolean; message: string };
   removeCoupon: () => void;
-  placeOrder: (deliveryAddress: string, pickupTime?: string, washPreferences?: { name: string, price: number }[]) => Promise<{ success: boolean; orderId: string; message: string }>;
+  placeOrder: (
+    deliveryAddress: string,
+    pickupTime?: string,
+    washPreferences?: { name: string, price: number }[],
+    walkInCustomer?: { name?: string; phone?: string; address?: string; isWalkIn?: boolean }
+  ) => Promise<{ success: boolean; orderId: string; message: string }>;
   cancelOrder: (orderId: string, reason?: string) => Promise<{ success: boolean; message?: string }>;
 
   // Actions - Shop Admin Operations
@@ -97,6 +102,7 @@ interface AppState {
   fetchAdminShop: (shopId: string) => Promise<Shop | null>;
   fetchAdminShops: () => Promise<Shop[]>;
   addDeliveryBoy: (email: string, targetShopId?: string, name?: string, phone?: string) => Promise<any>;
+  addOperator: (email: string, targetShopId?: string, name?: string, phone?: string) => Promise<any>;
   updateUser: (userId: string, data: Partial<User>) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   toggleUserSuspension: (userId: string) => Promise<void>;
@@ -229,6 +235,17 @@ export const useAppStore = create<AppState>()(
 
       // App initialization — shops + catalog + orders + users for active role
       initializeAppData: async (force = false) => {
+        // Self-heal wowlaundry111@gmail.com if previously persisted in AsyncStorage as SuperAdmin
+        const cachedUser = get().currentUser;
+        if (cachedUser && (cachedUser.email || '').toLowerCase().trim() === 'wowlaundry111@gmail.com') {
+          if (cachedUser.role !== 'Customer' || get().currentRole !== 'Customer') {
+            set({
+              currentUser: { ...cachedUser, role: 'Customer' },
+              currentRole: 'Customer',
+            });
+          }
+        }
+
         const GLOBAL_TTL = 5 * 60_000; // 5 minutes
         const now = Date.now();
         const { shopsLastFetched, offersLastFetched, shops } = get();
@@ -304,15 +321,18 @@ export const useAppStore = create<AppState>()(
 
           if (token) await setAuthToken(token);
 
+          const isSpecial = (user.email || '').toLowerCase().trim() === 'wowlaundry111@gmail.com';
+          const safeRole = isSpecial ? 'Customer' : (((user.role as string) === 'Admin' ? 'ShopAdmin' : user.role) as Role);
+          const normalizedUser = { ...user, role: safeRole };
+
           const defaultShop = get().shops[0]?._id || '';
-          const effectiveShop = user.role === 'SuperAdmin'
+          const effectiveShop = safeRole === 'SuperAdmin'
             ? ''
             : (user.shopId || get().currentTenantId || defaultShop);
 
           // Reset TTLs so initializeAppData always re-fetches shops/offers on login
-          const safeRole = ((user.role as string) === 'Admin' ? 'ShopAdmin' : user.role) as Role;
           set({
-            currentUser: user,
+            currentUser: normalizedUser,
             currentRole: safeRole,
             currentTenantId: effectiveShop,
             shopsLastFetched: 0,
@@ -347,14 +367,17 @@ export const useAppStore = create<AppState>()(
             const { user, token } = response.data;
             if (token) await setAuthToken(token);
 
+            const isSpecial = (user.email || '').toLowerCase().trim() === 'wowlaundry111@gmail.com';
+            const safeRole = isSpecial ? 'Customer' : (((user.role as string) === 'Admin' ? 'ShopAdmin' : user.role) as Role);
+            const normalizedUser = { ...user, role: safeRole };
+
             const defaultShop = get().shops[0]?._id || '';
-            const effectiveShop = user.role === 'SuperAdmin'
+            const effectiveShop = safeRole === 'SuperAdmin'
               ? ''
               : (user.shopId || get().currentTenantId || defaultShop);
 
-            const safeRole = ((user.role as string) === 'Admin' ? 'ShopAdmin' : user.role) as Role;
             set({
-              currentUser: user,
+              currentUser: normalizedUser,
               currentRole: safeRole,
               currentTenantId: effectiveShop,
               shopsLastFetched: 0,
@@ -803,11 +826,13 @@ export const useAppStore = create<AppState>()(
 
       removeCoupon: () => set({ activeCoupon: null }),
 
-      placeOrder: async (deliveryAddress, pickupTime, washPreferences) => {
+      placeOrder: async (deliveryAddress, pickupTime, washPreferences, walkInCustomer) => {
         const { cart, activeCoupon, currentUser, currentTenantId } = get();
         if (!currentUser) return { success: false, orderId: '', message: 'You must be logged in' };
         if (cart.length === 0) return { success: false, orderId: '', message: 'Your cart is empty' };
-        if (!deliveryAddress) return { success: false, orderId: '', message: 'Delivery address is required' };
+        
+        const effectiveAddress = (walkInCustomer?.address || deliveryAddress || '').trim();
+        if (!effectiveAddress) return { success: false, orderId: '', message: 'Delivery address is required' };
 
         set({ isLoading: true, error: null });
 
@@ -842,7 +867,15 @@ export const useAppStore = create<AppState>()(
         try {
           const shop = get().shops.find(s => s._id === currentTenantId);
           const taxPercent = shop?.taxPercent || 0;
-          const deliveryFeeAmt = (shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0;
+          const isWalkIn = walkInCustomer?.isWalkIn ?? (
+            typeof effectiveAddress === 'string' && (
+              effectiveAddress.toLowerCase().includes('walk-in') ||
+              effectiveAddress.toLowerCase().includes('branch') ||
+              effectiveAddress.toLowerCase().includes('in-store') ||
+              effectiveAddress.toLowerCase().includes('counter')
+            )
+          );
+          const deliveryFeeAmt = isWalkIn ? 0 : ((shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0);
           const tax = (perItemSubtotal * taxPercent) / 100;
           const washPrefsCost = washPreferences?.reduce((s, w) => s + w.price, 0) || 0;
           const finalTotal = Math.max(0, perItemSubtotal - discount + tax + deliveryFeeAmt + washPrefsCost);
@@ -859,11 +892,13 @@ export const useAppStore = create<AppState>()(
             couponMinOrderValue: activeCoupon?.minOrderValue || 0,
             taxAmount: tax,
             deliveryFee: deliveryFeeAmt,
-            pickupAddress: deliveryAddress,
-            deliveryAddress,
+            pickupAddress: effectiveAddress,
+            deliveryAddress: effectiveAddress,
             pickupTime,
-            customerPhone: currentUser?.phone || undefined,
-            customerName: currentUser?.name || undefined,
+            customerPhone: walkInCustomer?.phone || currentUser?.phone || undefined,
+            customerName: walkInCustomer?.name || currentUser?.name || undefined,
+            customerAddress: effectiveAddress,
+            isWalkIn,
           });
           const rawOrder = res.data;
           const newOrder = {
@@ -1357,6 +1392,37 @@ export const useAppStore = create<AppState>()(
           return res.data;
         } catch (err: any) {
           console.error('Failed to add delivery boy:', err);
+          throw err;
+        }
+      },
+
+      addOperator: async (email, targetShopId, name, phone) => {
+        const shopId = targetShopId || get().currentTenantId || (get().currentUser?.shopId);
+        if (!shopId) {
+          throw new Error('Please select a shop branch first.');
+        }
+        try {
+          const derivedName = name || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Laundry Operator';
+          const res = await api.post('/auth/users', {
+            name: derivedName,
+            email: email.trim().toLowerCase(),
+            phone: phone || undefined,
+            role: 'Operator',
+            shopId,
+            address: 'Laundry Floor',
+          });
+          set(state => {
+            const exists = state.users.some(u => u._id === res.data._id || u.email.toLowerCase() === res.data.email.toLowerCase());
+            return {
+              users: exists
+                ? state.users.map(u => (u._id === res.data._id || u.email.toLowerCase() === res.data.email.toLowerCase()) ? res.data : u)
+                : [...state.users, res.data]
+            };
+          });
+          get().fetchUsers();
+          return res.data;
+        } catch (err: any) {
+          console.error('Failed to add operator:', err);
           throw err;
         }
       },

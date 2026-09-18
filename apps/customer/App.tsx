@@ -59,7 +59,8 @@ export default function App() {
   }
 
   // Guard for non-customer accounts logged into the customer app
-  const isStaffAccount = currentUser && ['ShopAdmin', 'SuperAdmin', 'Delivery', 'Operator'].includes(currentUser.role) && !allowCustomerMode;
+  const isOfficialBranchAdmin = currentUser?.email?.toLowerCase().trim() === 'wowlaundry111@gmail.com';
+  const isStaffAccount = currentUser && ['ShopAdmin', 'SuperAdmin', 'Delivery', 'Operator'].includes(currentUser.role) && !allowCustomerMode && !isOfficialBranchAdmin;
 
   const handleOpenPartnerApp = async () => {
     // Attempt to open native partner app scheme or direct APK download
