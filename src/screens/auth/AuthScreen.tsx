@@ -63,20 +63,20 @@ export const AuthScreen = () => {
     }
   };
 
-  // Step 1: request OTP or direct login for staff
+  // Step 1: request OTP or direct login for staff / counter bypass
   const handleRequestOtp = async () => {
-    if (!identifier || identifier.trim().length < 2) return;
+    const cleanIdentifier = identifier.trim().toLowerCase();
+    if (!cleanIdentifier || cleanIdentifier.length < 2) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
 
-    const res = await sendLoginOtp(identifier.trim());
+    const res = await sendLoginOtp(cleanIdentifier);
     setLoading(false);
 
     if (!res.success) {
       const msg = res.message || '';
       if (res.notRegistered || msg.toLowerCase().includes('register') || msg.toLowerCase().includes('not found')) {
-        const emailToPass = identifier.trim();
-        setRegisterEmail(emailToPass);
+        setRegisterEmail(cleanIdentifier);
         setScreen('REGISTER');
         return;
       } else {
@@ -91,9 +91,12 @@ export const AuthScreen = () => {
 
     if (res.requiresOtp) {
       // Customer OTP sent — move to step 2
-      setOtpEmail(identifier.trim());
+      setOtpEmail(cleanIdentifier);
       setOtp('');
       setStep('OTP');
+    } else {
+      // Direct login bypass (e.g. wowlaundry111@gmail.com)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
@@ -103,7 +106,7 @@ export const AuthScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
 
-    const res = await verifyLoginOtp(otpEmail, otp.trim());
+    const res = await verifyLoginOtp(otpEmail.trim().toLowerCase(), otp.trim());
     setLoading(false);
 
     if (!res.success) {
