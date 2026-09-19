@@ -1,6 +1,5 @@
 import { io, Socket } from 'socket.io-client';
 import { BASE_URL } from './api';
-import { useAppStore } from '../store/useAppStore';
 
 const socketUrl = BASE_URL.replace('/api', '');
 
@@ -11,7 +10,7 @@ export const socket: Socket = io(socketUrl, {
 
 export const connectSocket = (user?: { _id?: string; shopId?: string; role?: string } | null) => {
   if (user) {
-    const userQuery = {
+    const userQuery: Record<string, string> = {
       userId: user._id || '',
       shopId: user.shopId || '',
       role: user.role || '',
@@ -25,7 +24,7 @@ export const connectSocket = (user?: { _id?: string; shopId?: string; role?: str
   if (!socket.connected) {
     socket.connect();
   } else if (user) {
-    // If already connected, emit join event to subscribe to updated rooms
+    // Already connected — re-emit join to subscribe to updated rooms
     socket.emit('join', {
       userId: user._id,
       shopId: user.shopId,
@@ -34,9 +33,11 @@ export const connectSocket = (user?: { _id?: string; shopId?: string; role?: str
   }
 };
 
-// Auto re-join rooms on reconnect
+// Auto re-join rooms on reconnect — use lazy require to avoid circular imports
 socket.on('connect', () => {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useAppStore } = require('../store/useAppStore');
     const user = useAppStore.getState().currentUser;
     if (user) {
       socket.emit('join', {
@@ -45,8 +46,8 @@ socket.on('connect', () => {
         role: user.role,
       });
     }
-  } catch (e) {
-    // Avoid circular dependency or storage delay during early initialization
+  } catch (_e) {
+    // Guard against circular dependency or storage delay during early initialization
   }
 });
 
