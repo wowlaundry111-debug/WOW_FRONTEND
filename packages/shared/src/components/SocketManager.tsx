@@ -1,13 +1,21 @@
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as Haptics from 'expo-haptics';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import { useAppStore } from '../store/useAppStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 
+const getEntityId = (entity: any): string => {
+  if (!entity) return '';
+  if (typeof entity === 'object' && entity._id) return String(entity._id);
+  return String(entity);
+};
+
 const triggerLocalAlert = (title: string, body: string, data?: any) => {
   try {
     if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Notifications.scheduleNotificationAsync({
         content: {
           title,
@@ -35,15 +43,27 @@ export const SocketManager: React.FC = () => {
     if (currentUser) {
       connectSocket(currentUser);
 
+      const currentUserId = String(currentUser._id || '');
+      const currentUserShopId = String(currentUser.shopId || '');
+      const userRole = String(currentUser.role || '');
+      const isSuperAdmin = userRole === 'SuperAdmin';
+      const isShopStaffRole = userRole === 'ShopAdmin' || userRole === 'Operator';
+      const isDeliveryRole = userRole === 'Delivery';
+
       // ── Order Events ─────────────────────────────────────────────────────────────
       const onOrderCreated = (order: any) => {
-        const isCustomer = currentUser.role === 'Customer' && String(currentUser._id) === String(order.customerId);
-        const isShopStaff = (currentUser.role === 'ShopAdmin' || currentUser.role === 'Operator') && String(currentUser.shopId) === String(order.shopId);
-        const isSuperAdmin = currentUser.role === 'SuperAdmin';
+        const orderCustomerId = getEntityId(order.customerId);
+        const orderShopId = getEntityId(order.shopId);
+
+        const isCustomer = Boolean(currentUserId && orderCustomerId === currentUserId);
+        const isShopStaff = Boolean(isShopStaffRole && currentUserShopId && orderShopId === currentUserShopId);
 
         if (isSuperAdmin || isShopStaff || isCustomer) {
           useAppStore.setState((state) => ({
-            orders: state.orders.some((o) => o._id === order._id) ? state.orders : [order, ...state.orders]
+            orders: state.orders.some((o) => String(o._id) === String(order._id))
+              ? state.orders
+              : [order, ...state.orders],
+            orderTotal: (state.orderTotal || state.orders.length) + (state.orders.some((o) => String(o._id) === String(order._id)) ? 0 : 1),
           }));
 
           const orderNumber = String(order._id).slice(-6).toUpperCase();
@@ -69,14 +89,17 @@ export const SocketManager: React.FC = () => {
       };
 
       const onOrderUpdated = (order: any) => {
-        const isCustomer = currentUser.role === 'Customer' && String(currentUser._id) === String(order.customerId);
-        const isShopStaff = (currentUser.role === 'ShopAdmin' || currentUser.role === 'Operator') && String(currentUser.shopId) === String(order.shopId);
-        const isDelivery = currentUser.role === 'Delivery' && String(currentUser._id) === String(order.deliveryBoyId);
-        const isSuperAdmin = currentUser.role === 'SuperAdmin';
+        const orderCustomerId = getEntityId(order.customerId);
+        const orderShopId = getEntityId(order.shopId);
+        const orderDeliveryBoyId = getEntityId(order.deliveryBoyId);
+
+        const isCustomer = Boolean(currentUserId && orderCustomerId === currentUserId);
+        const isShopStaff = Boolean(isShopStaffRole && currentUserShopId && orderShopId === currentUserShopId);
+        const isDelivery = Boolean(isDeliveryRole && currentUserId && orderDeliveryBoyId === currentUserId);
 
         if (isSuperAdmin || isShopStaff || isCustomer || isDelivery) {
           useAppStore.setState((state) => ({
-            orders: state.orders.map((o) => (o._id === order._id ? order : o))
+            orders: state.orders.map((o) => (String(o._id) === String(order._id) ? order : o))
           }));
 
           const orderNumber = String(order._id).slice(-6).toUpperCase();
@@ -94,6 +117,9 @@ export const SocketManager: React.FC = () => {
             } else if (order.status === 'READY_FOR_DELIVERY') {
               title = 'Clothes Clean & Ready ✨';
               body = `Your laundry is cleaned and packed, ready for delivery.`;
+            } else if (order.status === 'WASHING') {
+              title = 'Washing in Progress 🫧';
+              body = `Your garments are being washed with premium fabric care.`;
             } else if (order.status === 'PICKED_UP') {
               title = 'Laundry Picked Up 🧺';
               body = `Your laundry has been collected and is on its way to our wash unit.`;
@@ -137,95 +163,95 @@ export const SocketManager: React.FC = () => {
       // ── Shop Events ──────────────────────────────────────────────────────────────
       const onShopCreated = (shop: any) => {
         useAppStore.setState((state) => ({
-          shops: state.shops.some((s) => s._id === shop._id) ? state.shops : [...state.shops, shop]
+          shops: state.shops.some((s) => String(s._id) === String(shop._id)) ? state.shops : [...state.shops, shop]
         }));
       };
 
       const onShopUpdated = (shop: any) => {
         useAppStore.setState((state) => ({
-          shops: state.shops.map((s) => (s._id === shop._id ? shop : s))
+          shops: state.shops.map((s) => (String(s._id) === String(shop._id) ? shop : s))
         }));
       };
 
       const onShopDeleted = ({ shopId }: { shopId: string }) => {
         useAppStore.setState((state) => ({
-          shops: state.shops.filter((s) => s._id !== shopId)
+          shops: state.shops.filter((s) => String(s._id) !== String(shopId))
         }));
       };
 
       // ── Category Events ──────────────────────────────────────────────────────────
       const onCategoryCreated = (category: any) => {
         useAppStore.setState((state) => ({
-          categories: state.categories.some((c) => c._id === category._id) ? state.categories : [...state.categories, category]
+          categories: state.categories.some((c) => String(c._id) === String(category._id)) ? state.categories : [...state.categories, category]
         }));
       };
 
       const onCategoryUpdated = (category: any) => {
         useAppStore.setState((state) => ({
-          categories: state.categories.map((c) => (c._id === category._id ? category : c))
+          categories: state.categories.map((c) => (String(c._id) === String(category._id) ? category : c))
         }));
       };
 
       const onCategoryDeleted = ({ categoryId }: { categoryId: string }) => {
         useAppStore.setState((state) => ({
-          categories: state.categories.filter((c) => c._id !== categoryId)
+          categories: state.categories.filter((c) => String(c._id) !== String(categoryId))
         }));
       };
 
       // ── Item Events ──────────────────────────────────────────────────────────────
       const onItemCreated = (item: any) => {
         useAppStore.setState((state) => ({
-          items: state.items.some((i) => i._id === item._id) ? state.items : [...state.items, item]
+          items: state.items.some((i) => String(i._id) === String(item._id)) ? state.items : [...state.items, item]
         }));
       };
 
       const onItemUpdated = (item: any) => {
         useAppStore.setState((state) => ({
-          items: state.items.map((i) => (i._id === item._id ? item : i))
+          items: state.items.map((i) => (String(i._id) === String(item._id) ? item : i))
         }));
       };
 
       const onItemDeleted = ({ itemId }: { itemId: string }) => {
         useAppStore.setState((state) => ({
-          items: state.items.filter((i) => i._id !== itemId)
+          items: state.items.filter((i) => String(i._id) !== String(itemId))
         }));
       };
 
       // ── Offer Events ─────────────────────────────────────────────────────────────
       const onOfferCreated = (offer: any) => {
         useAppStore.setState((state) => ({
-          offers: state.offers.some((o) => o._id === offer._id) ? state.offers : [...state.offers, offer]
+          offers: state.offers.some((o) => String(o._id) === String(offer._id)) ? state.offers : [...state.offers, offer]
         }));
       };
 
       const onOfferUpdated = (offer: any) => {
         useAppStore.setState((state) => ({
-          offers: state.offers.map((o) => (o._id === offer._id ? offer : o))
+          offers: state.offers.map((o) => (String(o._id) === String(offer._id) ? offer : o))
         }));
       };
 
       const onOfferDeleted = ({ offerId }: { offerId: string }) => {
         useAppStore.setState((state) => ({
-          offers: state.offers.filter((o) => o._id !== offerId)
+          offers: state.offers.filter((o) => String(o._id) !== String(offerId))
         }));
       };
 
       // ── User Events ──────────────────────────────────────────────────────────────
       const onUserCreated = (user: any) => {
         useAppStore.setState((state) => ({
-          users: state.users.some((u) => u._id === user._id) ? state.users : [...state.users, user]
+          users: state.users.some((u) => String(u._id) === String(user._id)) ? state.users : [...state.users, user]
         }));
       };
 
       const onUserUpdated = (user: any) => {
         useAppStore.setState((state) => ({
-          users: state.users.map((u) => (u._id === user._id ? user : u))
+          users: state.users.map((u) => (String(u._id) === String(user._id) ? user : u))
         }));
       };
 
       const onUserDeleted = ({ userId }: { userId: string }) => {
         useAppStore.setState((state) => ({
-          users: state.users.filter((u) => u._id !== userId)
+          users: state.users.filter((u) => String(u._id) !== String(userId))
         }));
       };
 
