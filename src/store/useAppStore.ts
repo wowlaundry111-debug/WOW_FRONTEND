@@ -62,6 +62,7 @@ interface AppState {
   addToCart: (item: Item, quantity: number) => void;
   removeFromCart: (itemId: string) => void;
   updateCartQuantity: (itemId: string, quantity: number) => void;
+  setCartItemWeight: (itemId: string, kgWeight: number) => void;
   clearCart: () => void;
   applyCoupon: (code: string) => { success: boolean; message: string };
   removeCoupon: () => void;
@@ -773,6 +774,25 @@ export const useAppStore = create<AppState>()(
         set({ cart: get().cart.map(c => c.itemId === itemId ? { ...c, quantity } : c) });
       },
 
+      setCartItemWeight: (itemId, kgWeight) => {
+        const nextCart = get().cart.map(c => {
+          if (c.itemId !== itemId) return c;
+          const isKg = Boolean(c.pricePerKg && c.pricePerKg > 0) || 
+            c.unit === 'KG' || 
+            (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg')));
+          if (!isKg) return c;
+          const validWeight = Math.max(0, Number(kgWeight) || 0);
+          const rate = Number(c.pricePerKg) || Number(c.price) || 0;
+          const calculatedPrice = validWeight > 0 ? Math.round(validWeight * rate * 100) / 100 : 0;
+          return {
+            ...c,
+            kgWeight: validWeight > 0 ? validWeight : undefined,
+            price: calculatedPrice,
+          };
+        });
+        set({ cart: nextCart });
+      },
+
       clearCart: () => set({ cart: [], activeCoupon: null, deliveryInstructions: '' }),
 
       applyCoupon: (code) => {
@@ -841,9 +861,16 @@ export const useAppStore = create<AppState>()(
           (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg'))) || 
           Boolean(c.pricePerKg && c.pricePerKg > 0);
 
-        const perItemSubtotal = cart
-          .filter(c => !isKgItemCheck(c))
-          .reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
+        const hasKgItems = cart.some(isKgItemCheck);
+        const allKgWeighed = hasKgItems && cart.filter(isKgItemCheck).every(c => c.kgWeight && Number(c.kgWeight) > 0);
+
+        const perItemSubtotal = cart.reduce((sum, c) => {
+          if (isKgItemCheck(c)) {
+            const rate = Number(c.pricePerKg) || Number(c.price) || 0;
+            return sum + (c.kgWeight && Number(c.kgWeight) > 0 ? Math.round(Number(c.kgWeight) * rate * 100) / 100 : 0);
+          }
+          return sum + (c.price || 0) * c.quantity;
+        }, 0);
 
         let discount = 0;
         if (activeCoupon) {
@@ -852,12 +879,19 @@ export const useAppStore = create<AppState>()(
 
         const orderItems: OrderItem[] = cart.map(c => {
           const isKg = isKgItemCheck(c);
+          const rate = Number(c.pricePerKg) || Number(c.price) || 0;
+          const finalPrice = isKg
+            ? (c.kgWeight && Number(c.kgWeight) > 0 ? Math.round(Number(c.kgWeight) * rate * 100) / 100 : 0)
+            : (c.price || 0);
+
           return {
             itemId: c.itemId,
             name: c.name,
             quantity: c.quantity,
             unit: isKg ? 'KG' : 'ITEM',
-            price: isKg ? 0 : (c.price || 0),
+            price: finalPrice,
+            pricePerKg: c.pricePerKg,
+            kgWeight: isKg && c.kgWeight && Number(c.kgWeight) > 0 ? Number(c.kgWeight) : undefined,
             categoryName: c.categoryName,
             subCategoryName: c.subCategoryName,
             isBucket: c.isBucket,
@@ -885,6 +919,7 @@ export const useAppStore = create<AppState>()(
             items: orderItems,
             washPreferences,
             totalAmount: finalTotal,
+            kgPriceUpdated: hasKgItems && allKgWeighed,
             discountAmount: discount,
             couponCode: activeCoupon?.code || undefined,
             couponDiscountPercent: activeCoupon?.discountPercent || undefined,

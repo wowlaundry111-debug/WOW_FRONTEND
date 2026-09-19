@@ -33,7 +33,12 @@ import {
   Package,
   Scale,
   Trash2,
+  Banknote,
+  Smartphone,
+  AlertTriangle,
+  Wifi,
 } from 'lucide-react-native';
+import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 import { StatusBadge } from '../../components/UIPack';
@@ -289,6 +294,143 @@ const WeighKgModal: React.FC<WeighKgModalProps> = ({
   );
 };
 
+interface AdminPaymentModalProps {
+  visible: boolean;
+  order: Order | null;
+  qrValue: string | null;
+  onClose: () => void;
+  onPay: (mode: 'UPI' | 'COD') => Promise<void>;
+}
+
+const AdminPaymentModal: React.FC<AdminPaymentModalProps> = ({
+  visible,
+  order,
+  qrValue,
+  onClose,
+  onPay,
+}) => {
+  const [paying, setPaying] = useState(false);
+
+  if (!order || !visible) return null;
+
+  const dynamicQr = qrValue
+    ? (qrValue.includes('&am=') ? qrValue : `${qrValue}&am=${order.totalAmount.toFixed(2)}&tn=LaundryPayment`)
+    : null;
+
+  const handlePay = async (mode: 'UPI' | 'COD') => {
+    setPaying(true);
+    await onPay(mode);
+    setPaying(false);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.modalContent, { maxHeight: '90%', paddingBottom: 24 }]}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Header */}
+            <View style={styles.payModalHeader}>
+              <View>
+                <Text style={styles.modalPreHeading}>ADMIN CHECKOUT</Text>
+                <Text style={styles.modalHeading}>COLLECT PAYMENT</Text>
+                <Text style={styles.payOrderId}>
+                  Order #{order._id.slice(-6).toUpperCase()} · {order.customerName}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn} disabled={paying}>
+                <X size={20} color={COLORS.black} strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Amount Badge */}
+            <View style={styles.amountBadge}>
+              <Text style={styles.amountLabel}>TOTAL AMOUNT DUE</Text>
+              <Text style={styles.amountValue}>₹{order.totalAmount.toFixed(2)}</Text>
+            </View>
+
+            {/* QR Code Section */}
+            {dynamicQr ? (
+              <View style={styles.qrSection}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+                  <Smartphone size={18} color={COLORS.black} strokeWidth={2.5} />
+                  <Text style={styles.qrInstruction}>
+                    Scan and pay via any UPI app
+                  </Text>
+                </View>
+                <View style={styles.qrBox}>
+                  <QRCode
+                    value={dynamicQr}
+                    size={190}
+                    backgroundColor="white"
+                    color={COLORS.black}
+                  />
+                </View>
+                <Text style={styles.qrHint}>UPI · Google Pay · PhonePe · Paytm</Text>
+              </View>
+            ) : (
+              <View style={styles.noUpiBox}>
+                <AlertTriangle size={24} color={COLORS.black} strokeWidth={2.5} style={{ marginBottom: 4 }} />
+                <Text style={styles.noUpiText}>UPI not configured for this branch</Text>
+                <Text style={styles.noUpiSub}>Collect cash from customer or set UPI ID in Shop Settings</Text>
+              </View>
+            )}
+
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>SELECT PAYMENT MODE</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Payment Action Buttons */}
+            <View style={styles.payBtnsRow}>
+              {/* Cash */}
+              <TouchableOpacity
+                style={[styles.payBtn, styles.payBtnCash]}
+                onPress={() => handlePay('COD')}
+                disabled={paying}
+              >
+                {paying ? (
+                  <ActivityIndicator color={COLORS.black} size="small" />
+                ) : (
+                  <>
+                    <Banknote size={22} color={COLORS.black} strokeWidth={2.5} />
+                    <Text style={[styles.payBtnText, { color: COLORS.black }]}>
+                      CASH{'\n'}COLLECTED
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* Online / UPI */}
+              <TouchableOpacity
+                style={[styles.payBtn, styles.payBtnOnline]}
+                onPress={() => handlePay('UPI')}
+                disabled={paying}
+              >
+                {paying ? (
+                  <ActivityIndicator color={COLORS.white} size="small" />
+                ) : (
+                  <>
+                    <Wifi size={22} color={COLORS.white} strokeWidth={2.5} />
+                    <Text style={[styles.payBtnText, { color: COLORS.white }]}>
+                      ONLINE{'\n'}PAID
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
 export const AdminOrdersScreen: React.FC = () => {
   const {
     orders,
@@ -309,8 +451,23 @@ export const AdminOrdersScreen: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [assignModalOrder, setAssignModalOrder] = useState<Order | null>(null);
   const [weighModalOrder, setWeighModalOrder] = useState<Order | null>(null);
+  const [paymentModalOrder, setPaymentModalOrder] = useState<Order | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+
+  const handlePaymentConfirm = async (mode: 'UPI' | 'COD') => {
+    if (!paymentModalOrder) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    try {
+      await updateOrderStatus(paymentModalOrder._id, 'DELIVERED', mode, 'SUCCESS');
+      if (selectedOrder && selectedOrder._id === paymentModalOrder._id) {
+        setSelectedOrder(null);
+      }
+      setPaymentModalOrder(null);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to complete payment and delivery');
+    }
+  };
 
   const [editPrice, setEditPrice] = useState('');
   const [editNotes, setEditNotes] = useState('');
@@ -860,7 +1017,7 @@ export const AdminOrdersScreen: React.FC = () => {
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <TouchableOpacity
                       style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]}
-                      onPress={() => handleStatusChange(order._id, 'DELIVERED')}
+                      onPress={() => setPaymentModalOrder(order)}
                     >
                       <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
                         MARK DELIVERED
@@ -1252,6 +1409,24 @@ export const AdminOrdersScreen: React.FC = () => {
                         </View>
                       )}
 
+                      {selectedOrder.status === 'OUT_FOR_DELIVERY' && (
+                        <View style={{ marginBottom: 12 }}>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#10B981', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
+                            onPress={() => {
+                              const o = selectedOrder;
+                              setSelectedOrder(null);
+                              setPaymentModalOrder(o);
+                            }}
+                          >
+                            <CheckCircle size={16} color={COLORS.white} />
+                            <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                              COLLECT PAYMENT & MARK DELIVERED
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
                       {/* Admin Editable Overrides */}
                       <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>OVERRIDE TOTAL AMOUNT (₹)</Text>
@@ -1368,6 +1543,24 @@ export const AdminOrdersScreen: React.FC = () => {
             Alert.alert('Error', res.message);
           }
         }}
+      />
+      {/* Admin Payment Collection Modal with QR */}
+      <AdminPaymentModal
+        visible={!!paymentModalOrder}
+        order={paymentModalOrder}
+        qrValue={(() => {
+          if (!paymentModalOrder) return null;
+          const orderShop = shops.find((s) => s._id === paymentModalOrder.shopId);
+          if (orderShop?.paymentInfo?.qrValue) {
+            return orderShop.paymentInfo.qrValue;
+          }
+          if (orderShop?.paymentInfo?.upiId) {
+            return `upi://pay?pa=${orderShop.paymentInfo.upiId}&pn=${encodeURIComponent(orderShop?.name || 'Laundry')}&cu=INR`;
+          }
+          return null;
+        })()}
+        onClose={() => setPaymentModalOrder(null)}
+        onPay={handlePaymentConfirm}
       />
     </View>
   );
@@ -2242,5 +2435,136 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontFamily: 'Outfit_800ExtraBold',
     letterSpacing: 0.5,
+  },
+  payModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
+  },
+  payOrderId: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  amountBadge: {
+    backgroundColor: COLORS.black,
+    borderRadius: RADIUS.md,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    ...NEO_SHADOW.box4,
+  },
+  amountLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#9CA3AF',
+    letterSpacing: 1,
+  },
+  amountValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: COLORS.white,
+    marginTop: 2,
+  },
+  qrSection: {
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  qrInstruction: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  qrBox: {
+    backgroundColor: COLORS.white,
+    borderWidth: 3,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.md,
+    padding: 16,
+    ...NEO_SHADOW.box4,
+    marginBottom: 8,
+  },
+  qrHint: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 0.5,
+  },
+  noUpiBox: {
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  noUpiText: {
+    fontSize: 13,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#92400E',
+  },
+  noUpiSub: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: SPACING.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    fontSize: 10,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#9CA3AF',
+    letterSpacing: 0.5,
+  },
+  payBtnsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  payBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 16,
+    borderWidth: 2.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.md,
+    ...NEO_SHADOW.box4,
+  },
+  payBtnCash: {
+    backgroundColor: COLORS.secondary,
+  },
+  payBtnOnline: {
+    backgroundColor: '#0D8DE3',
+  },
+  payBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
 });

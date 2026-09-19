@@ -39,6 +39,7 @@ import {
   ChevronUp,
   Store,
   Truck,
+  Scale,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -217,6 +218,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   const {
     cart,
     addToCart,
+    setCartItemWeight,
     clearCart,
     placeOrder,
     currentUser,
@@ -247,7 +249,6 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   const washPrefsCost = activeWashPreferences.reduce((sum, wp) => sum + wp.price, 0);
 
   const isKgItem = (c: any) => 
-
     c.unit === 'KG' || 
     (typeof c.name === 'string' && (c.name.toLowerCase().includes('per kg') || c.name.toLowerCase().includes('/ kg') || c.name.toLowerCase().includes('per-kg'))) || 
     Boolean(c.pricePerKg && c.pricePerKg > 0);
@@ -261,13 +262,25 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   const [walkInPhone, setWalkInPhone] = useState('');
   const [walkInMode, setWalkInMode] = useState<'BRANCH_PICKUP' | 'HOME_DELIVERY'>('BRANCH_PICKUP');
 
+  const calculateItemPrice = (c: any) => {
+    if (isKgItem(c)) {
+      if (c.kgWeight && Number(c.kgWeight) > 0) {
+        const rate = Number(c.pricePerKg) || Number(c.price) || 0;
+        return Math.round(Number(c.kgWeight) * rate * 100) / 100;
+      }
+      return 0;
+    }
+    return (c.price || 0) * (c.quantity || 1);
+  };
+
   const hasKgItems = cart.some(isKgItem);
+  const hasUnweighedKgItems = cart.some(c => isKgItem(c) && (!c.kgWeight || Number(c.kgWeight) <= 0));
   const perItemSubtotal = cart.filter(c => !isKgItem(c)).reduce((sum, c) => sum + (c.price || 0) * c.quantity, 0);
-  const subtotal = perItemSubtotal;
+  const subtotal = cart.reduce((sum, c) => sum + calculateItemPrice(c), 0);
   const taxPercent = shop?.taxPercent !== undefined ? Number(shop.taxPercent) : 5;
   const shopDeliveryFee = (shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0;
   const isWalkIn = isStaffOrBranchAdmin && walkInMode === 'BRANCH_PICKUP';
-  const deliveryFee = isWalkIn ? 0 : (hasKgItems ? shopDeliveryFee : (subtotal > 500 ? 0 : shopDeliveryFee));
+  const deliveryFee = isWalkIn ? 0 : (hasUnweighedKgItems ? shopDeliveryFee : (subtotal > 500 ? 0 : shopDeliveryFee));
   const tax = (subtotal * taxPercent) / 100;
   const discount = activeCoupon
     ? Math.min((subtotal * activeCoupon.discountPercent) / 100, activeCoupon.maxDiscount)
@@ -1074,9 +1087,29 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                             </Text>
                           )}
                           {isKg ? (
-                            <Text style={[styles.cartItemRate, { color: '#0284C7', fontWeight: '800' }]}>
-                              {item.pricePerKg ? `₹${item.pricePerKg}/kg · Weighed at delivery` : 'Weighed at delivery'}
-                            </Text>
+                            <View>
+                              <Text style={[styles.cartItemRate, { color: '#0284C7', fontWeight: '800' }]}>
+                                {item.pricePerKg ? `₹${item.pricePerKg}/kg · Weighed at delivery` : 'Weighed at delivery'}
+                              </Text>
+                              {isStaffOrBranchAdmin && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', borderWidth: 1.5, borderColor: COLORS.black, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginTop: 4, gap: 4, alignSelf: 'flex-start' }}>
+                                  <Scale size={11} color={COLORS.black} strokeWidth={2.5} />
+                                  <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>WT:</Text>
+                                  <TextInput
+                                    keyboardType="decimal-pad"
+                                    placeholder="0.00"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={item.kgWeight ? String(item.kgWeight) : ''}
+                                    onChangeText={(val) => {
+                                      const parsed = parseFloat(val);
+                                      setCartItemWeight(item.itemId, isNaN(parsed) ? 0 : parsed);
+                                    }}
+                                    style={{ fontSize: 11, fontWeight: '900', color: COLORS.black, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.black, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, minWidth: 44, textAlign: 'center' }}
+                                  />
+                                  <Text style={{ fontSize: 9, fontWeight: '900', color: COLORS.black }}>KG</Text>
+                                </View>
+                              )}
+                            </View>
                           ) : (
                             <Text style={styles.cartItemRate}>₹{item.price} per unit</Text>
                           )}
@@ -1124,8 +1157,12 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                           </TouchableOpacity>
                         </View>
 
-                        <Text style={[styles.cartItemTotal, isKg && { fontSize: 13, color: '#0284C7' }]}>
-                          {isKg ? 'Pending' : `₹${(item.price || 0) * item.quantity}`}
+                        <Text style={[styles.cartItemTotal, isKg && { fontSize: 13, color: (item.kgWeight && Number(item.kgWeight) > 0) ? COLORS.black : '#0284C7' }]}>
+                          {isKg
+                            ? (item.kgWeight && Number(item.kgWeight) > 0
+                                ? `₹${Math.round(Number(item.kgWeight) * (Number(item.pricePerKg) || Number(item.price) || 0) * 100) / 100}`
+                                : (isStaffOrBranchAdmin ? 'Add Wt' : 'Pending'))
+                            : `₹${(item.price || 0) * item.quantity}`}
                         </Text>
                       </View>
                       {idx < cart.length - 1 && <View style={styles.itemDivider} />}
@@ -1231,10 +1268,10 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
             <View style={styles.billRow}>
               <Text style={styles.billLabel}>Items Subtotal</Text>
               <Text style={styles.billVal}>
-                {perItemSubtotal > 0 ? `₹${perItemSubtotal}` : (hasKgItems ? 'Pending Weighing' : '₹0')}
+                {subtotal > 0 ? `₹${subtotal}` : (hasUnweighedKgItems ? 'Pending Weighing' : '₹0')}
               </Text>
             </View>
-            {hasKgItems && (
+            {hasUnweighedKgItems && (
               <View style={[styles.billRow, { backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, marginTop: 4 }]}>
                 <Text style={[styles.billLabel, { color: '#0284C7', fontWeight: '800' }]}>KG Clothes</Text>
                 <Text style={[styles.billVal, { color: '#0284C7', fontWeight: '800' }]}>Weighed at delivery</Text>
