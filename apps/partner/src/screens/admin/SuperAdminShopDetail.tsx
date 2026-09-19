@@ -1,26 +1,53 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { ArrowLeft, Trash2, Truck, User, Sparkles, Plus, ShieldCheck } from 'lucide-react-native';
-import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { ArrowLeft, User, Phone, Mail, Trash2, Store, Truck, Sparkles, Building2, ShieldCheck, Plus } from 'lucide-react-native';
 import { useAppStore } from '../../store/useAppStore';
+import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 
-interface Props {
+interface SuperAdminShopDetailProps {
   shopId: string;
   onBack: () => void;
 }
 
-export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
-  const { shops, users, orders, updateShop, deleteUser, addDeliveryBoy, addOperator } = useAppStore();
+export const SuperAdminShopDetail: React.FC<SuperAdminShopDetailProps> = ({ shopId, onBack }) => {
+  const { shops, users, orders, updateShop, deleteUser, addDeliveryBoy, addOperator, fetchAdminShop } = useAppStore();
   const shop = shops.find((s) => s._id === shopId);
 
   const [activeTab, setActiveTab] = useState<'details' | 'staff' | 'orders'>('details');
 
   // Edit Shop State
   const [shopName, setShopName] = useState(shop?.name || '');
+  const [branchEmail, setBranchEmail] = useState(shop?.email || '');
   const [branchStr, setBranchStr] = useState(shop?.branches?.join(', ') || '');
   const [upiId, setUpiId] = useState(shop?.paymentInfo?.upiId || '');
   const [bankName, setBankName] = useState(shop?.paymentInfo?.bankName || '');
   const [accountNo, setAccountNo] = useState(shop?.paymentInfo?.accountNo || '');
+
+  useEffect(() => {
+    if (shopId) {
+      fetchAdminShop(shopId);
+    }
+  }, [shopId, fetchAdminShop]);
+
+  useEffect(() => {
+    if (shop) {
+      setShopName(shop.name || '');
+      setBranchEmail(shop.email || '');
+      setBranchStr(shop.branches?.join(', ') || '');
+      setUpiId(shop.paymentInfo?.upiId || '');
+      setBankName(shop.paymentInfo?.bankName || '');
+      setAccountNo(shop.paymentInfo?.accountNo || '');
+    }
+  }, [shop]);
 
   // Add Branch Staff State (No password required)
   const [newStaffRole, setNewStaffRole] = useState<'Operator' | 'Delivery'>('Operator');
@@ -64,6 +91,7 @@ export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
     try {
       await updateShop(shopId, {
         name: shopName,
+        email: branchEmail.trim(),
         branches: branchStr.split(',').map((s) => s.trim()).filter(Boolean),
         paymentInfo: {
           upiId,
@@ -128,6 +156,19 @@ export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>SHOP NAME</Text>
               <TextInput style={styles.input} value={shopName} onChangeText={setShopName} />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>BRANCH EMAIL ID</Text>
+              <TextInput
+                style={styles.input}
+                value={branchEmail}
+                onChangeText={setBranchEmail}
+                placeholder="branch@wowlaundry.com"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
             </View>
 
             <View style={styles.inputGroup}>

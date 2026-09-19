@@ -58,6 +58,7 @@ export interface Shop {
   pickupTimings?: string[];
   promoCode?: ShopPromoCode;
   contactNumber?: string;
+  email?: string;
   washPreferences?: WashPreference[];
   promoBanners?: PromoBanner[];
   minOrderValue?: number;

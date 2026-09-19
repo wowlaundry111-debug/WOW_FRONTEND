@@ -176,6 +176,7 @@ export const AdminShopScreen: React.FC = () => {
   const [bankName, setBankName] = useState(currentShop?.paymentInfo?.bankName || '');
   const [accountNo, setAccountNo] = useState(currentShop?.paymentInfo?.accountNo || '');
   const [contactNumber, setContactNumber] = useState(currentShop?.contactNumber || '');
+  const [branchEmail, setBranchEmail] = useState(currentShop?.email || '');
   const [instructions, setInstructions] = useState(currentShop?.instructions || '');
 
   // Pickup Timings Slots
@@ -226,6 +227,7 @@ export const AdminShopScreen: React.FC = () => {
       setBankName(currentShop.paymentInfo?.bankName || '');
       setAccountNo(currentShop.paymentInfo?.accountNo || '');
       setContactNumber(currentShop.contactNumber || '');
+      setBranchEmail(currentShop.email || '');
       setInstructions(currentShop.instructions || '');
       if (currentShop.pickupTimings && currentShop.pickupTimings.length > 0) {
         setPickupTimings(currentShop.pickupTimings);
@@ -299,6 +301,7 @@ export const AdminShopScreen: React.FC = () => {
         taxPercent: Number(taxPercent) || 0,
         deliveryFee: Number(deliveryFee) || 0,
         contactNumber,
+        email: branchEmail.trim(),
         instructions,
         promoBanners,
         washPreferences,
@@ -579,6 +582,19 @@ export const AdminShopScreen: React.FC = () => {
                       placeholderTextColor="#9CA3AF"
                     />
                   </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>BRANCH EMAIL ID</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={branchEmail}
+                    onChangeText={setBranchEmail}
+                    placeholder="branch@wowlaundry.com"
+                    placeholderTextColor="#9CA3AF"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
                 </View>
 
                 <View style={styles.inputGroup}>

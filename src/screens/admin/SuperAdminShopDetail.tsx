@@ -17,6 +17,7 @@ export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
 
   // Edit Shop State
   const [shopName, setShopName] = useState(shop?.name || '');
+  const [branchEmail, setBranchEmail] = useState(shop?.email || '');
   const [branchStr, setBranchStr] = useState(shop?.branches?.join(', ') || '');
   const [upiId, setUpiId] = useState(shop?.paymentInfo?.upiId || '');
   const [bankName, setBankName] = useState(shop?.paymentInfo?.bankName || '');
@@ -33,6 +34,7 @@ export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
     try {
       await updateShop(shopId, {
         name: shopName,
+        email: branchEmail.trim(),
         branches: branchStr.split(',').map((s) => s.trim()).filter(Boolean),
         paymentInfo: {
           upiId,
@@ -97,6 +99,19 @@ export const SuperAdminShopDetail: React.FC<Props> = ({ shopId, onBack }) => {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>SHOP NAME</Text>
               <TextInput style={styles.input} value={shopName} onChangeText={setShopName} />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>BRANCH EMAIL ID</Text>
+              <TextInput
+                style={styles.input}
+                value={branchEmail}
+                onChangeText={setBranchEmail}
+                placeholder="branch@wowlaundry.com"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
             </View>
 
             <View style={styles.inputGroup}>

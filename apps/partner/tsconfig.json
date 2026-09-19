@@ -2,7 +2,10 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
-    "lib": ["dom", "esnext"],
+    "lib": [
+      "dom",
+      "esnext"
+    ],
     "jsx": "react-native",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
@@ -11,13 +14,18 @@
     "strict": false,
     "baseUrl": ".",
     "paths": {
-      "@wow/shared": ["../../packages/shared/src/index"],
-      "@wow/shared/*": ["../../packages/shared/src/*"]
+      "@wow/shared": [
+        "../../packages/shared/src/index"
+      ],
+      "@wow/shared/*": [
+        "../../packages/shared/src/*"
+      ]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     "../../packages/shared/src/**/*"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
