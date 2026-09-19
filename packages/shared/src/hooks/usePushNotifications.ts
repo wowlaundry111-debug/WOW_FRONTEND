@@ -5,7 +5,6 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import api from '../services/api';
 import { useAppStore } from '../store/useAppStore';
-
 import { useNotificationStore } from '../store/useNotificationStore';
 
 Notifications.setNotificationHandler({
@@ -18,38 +17,65 @@ Notifications.setNotificationHandler({
   }),
 });
 
+let cachedPushToken: string | undefined = undefined;
+
 export function usePushNotifications() {
-  const [expoPushToken, setExpoPushToken] = useState<string | undefined>();
+  const [expoPushToken, setExpoPushToken] = useState<string | undefined>(cachedPushToken);
   const [notification, setNotification] = useState<Notifications.Notification | undefined>();
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   
-  const currentUser = useAppStore((state: any) => state.currentUser); // To know if user is logged in
+  const currentUser = useAppStore((state: any) => state.currentUser);
+
+  // Sync token whenever currentUser becomes available or changes
+  useEffect(() => {
+    if (cachedPushToken && currentUser?._id) {
+      saveTokenToBackend(cachedPushToken);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return; // Push notification listeners are unsupported on Web
+    if (Platform.OS === 'web') {
+      // On Web, request standard browser Notification permission if available
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+      return;
+    }
 
     registerForPushNotificationsAsync().then(pushToken => {
-      setExpoPushToken(pushToken);
-      
-      // If we got a token and we are logged in, send it to the backend immediately
-      if (pushToken && currentUser) {
-        saveTokenToBackend(pushToken);
+      if (pushToken) {
+        cachedPushToken = pushToken;
+        setExpoPushToken(pushToken);
+        if (currentUser?._id) {
+          saveTokenToBackend(pushToken);
+        }
       }
     });
 
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
-      // Add it to our persistent store!
-      useNotificationStore.getState().addNotification({
-        title: notification.request.content.title || 'New Notification',
-        body: notification.request.content.body || '',
-        data: notification.request.content.data,
-      });
+      // Add incoming foreground notification to persistent store
+      const content = notification.request?.content;
+      if (content) {
+        useNotificationStore.getState().addNotification({
+          title: content.title || 'New Notification',
+          body: content.body || '',
+          data: content.data,
+        });
+      }
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Notification response:', response);
+      console.log('Notification response received:', response);
+      const content = response.notification?.request?.content;
+      if (content) {
+        useNotificationStore.getState().addNotification({
+          title: content.title || 'New Notification',
+          body: content.body || '',
+          data: content.data,
+        });
+      }
     });
 
     return () => {
@@ -60,12 +86,12 @@ export function usePushNotifications() {
         responseListener.current.remove();
       }
     };
-  }, [currentUser]); // Re-run if user logs in/out
+  }, []);
 
   async function saveTokenToBackend(pushToken: string) {
     try {
       await api.put('/auth/users/push-token', { expoPushToken: pushToken });
-      console.log('Successfully registered push token with backend');
+      console.log('Successfully registered push token with backend:', pushToken);
     } catch (error) {
       console.error('Failed to save push token to backend:', error);
     }
@@ -81,7 +107,6 @@ async function registerForPushNotificationsAsync() {
   let token;
 
   if (Platform.OS === 'web') {
-    console.log('Push notifications are not supported on web');
     return undefined;
   }
 
@@ -98,7 +123,7 @@ async function registerForPushNotificationsAsync() {
       showBadge: true,
     });
 
-    // Also configure default channel so any untargeted notifications display as WoW Laundry
+    // Also configure default channel
     await Notifications.setNotificationChannelAsync('default', {
       name: 'WoW Laundry',
       description: 'WoW Laundry notifications',
@@ -121,29 +146,32 @@ async function registerForPushNotificationsAsync() {
     }
     
     if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
+      console.log('Push notification permission was not granted');
       return undefined;
     }
     
-    // Get project ID required for Expo EAS Build
+    // Determine project ID with known fallbacks
+    const bundleId = Constants?.expoConfig?.ios?.bundleIdentifier || Constants?.expoConfig?.android?.package || '';
+    const isPartner = bundleId.includes('partner') || Constants?.expoConfig?.slug === 'wow-partner';
+    const fallbackProjectId = isPartner
+      ? 'baf0aeae-04f2-4eed-9265-1d887e62f906'
+      : '8813961e-0829-4933-bbec-4f1d58b2f52c';
+
     const projectId =
-      Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-      
-    if (!projectId) {
-      console.warn('No EAS projectId found in app.json. Remote push notifications are disabled. Run `eas init` to set up.');
-      return undefined;
-    }
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId ??
+      fallbackProjectId;
 
     try {
       token = (await Notifications.getExpoPushTokenAsync({
         projectId,
       })).data;
-      console.log('Expo Push Token:', token);
+      console.log('Expo Push Token registered:', token);
     } catch (e) {
       console.error('Error fetching Expo Push Token:', e);
     }
   } else {
-    console.log('Must use physical device for Push Notifications');
+    console.log('Push notifications require a physical device; running in simulator/emulator environment');
   }
 
   return token;

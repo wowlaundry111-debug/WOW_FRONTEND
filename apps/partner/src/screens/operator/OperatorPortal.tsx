@@ -40,6 +40,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppStore } from '../../store/useAppStore';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
+import { NotificationBell } from '../../components/NotificationBell';
 import { Order, OrderStatus } from '../../types';
 import { sortShopsWithLpuFirst } from '../../utils/branchHelper';
 
@@ -380,6 +381,7 @@ export const OperatorPortal: React.FC = () => {
         </View>
 
         <View style={styles.topBarActions}>
+          <NotificationBell color={COLORS.black} buttonStyle={styles.notifBtn} />
           <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh} activeOpacity={0.8}>
             <RefreshCw size={17} color={COLORS.black} strokeWidth={2.5} />
           </TouchableOpacity>
@@ -712,6 +714,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  notifBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...NEO_SHADOW.box2,
   },
   refreshBtn: {
     width: 40,

@@ -15,6 +15,7 @@ import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Them
 import { useAppStore } from '../../store/useAppStore';
 import { Order } from '../../types';
 import { DeliveryTaskSkeleton } from '../../components/SkeletonLoaders';
+import { NotificationBell } from '../../components/NotificationBell';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedView = Animated.View as any;
@@ -787,10 +788,13 @@ export const DeliveryTasksScreen = () => {
             </Text>
           </View>
 
-          {/* Shift Icon Pill */}
-          <View style={styles.shiftPill}>
-            <Truck size={14} color={COLORS.black} strokeWidth={2.5} />
-            <Text style={styles.shiftPillText}>RIDER</Text>
+          {/* Shift Icon Pill & Notification Bell */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <NotificationBell color={COLORS.white} />
+            <View style={styles.shiftPill}>
+              <Truck size={14} color={COLORS.black} strokeWidth={2.5} />
+              <Text style={styles.shiftPillText}>RIDER</Text>
+            </View>
           </View>
         </View>
 
