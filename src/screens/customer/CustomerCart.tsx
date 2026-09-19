@@ -1307,7 +1307,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
             <View style={styles.grandTotalRow}>
               <Text style={styles.grandTotalLabel}>TO PAY</Text>
               <Text style={styles.grandTotalVal}>
-                {hasKgItems ? 'Pending Calculation' : `₹${total.toFixed(0)}`}
+                {hasUnweighedKgItems ? 'Pending Calculation' : `₹${total.toFixed(0)}`}
               </Text>
             </View>
           </View>
@@ -1330,12 +1330,12 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                   {isClosed ? 'BRANCH CLOSED' : 'PLACE ORDER'}
                 </Text>
                 <Text style={styles.placeOrderSubText}>
-                  {cart.length} Item{cart.length > 1 ? 's' : ''} · {hasKgItems ? 'Pay After Weighing' : 'Standard Delivery'}
+                  {cart.length} Item{cart.length > 1 ? 's' : ''} · {hasUnweighedKgItems ? 'Pay After Weighing' : 'Standard Delivery'}
                 </Text>
               </View>
               <View style={styles.totalPill}>
                 <Text style={styles.totalPillText}>
-                  {hasKgItems ? 'Pay After Weighing →' : `₹${total.toFixed(0)} →`}
+                  {hasUnweighedKgItems ? 'Pay After Weighing →' : `₹${total.toFixed(0)} →`}
                 </Text>
               </View>
             </>
