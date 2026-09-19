@@ -1,6 +1,6 @@
 // WOW Laundry Core TypeScript Types
 
-export type Role = 'SuperAdmin' | 'ShopAdmin' | 'Customer' | 'Delivery';
+export type Role = 'SuperAdmin' | 'ShopAdmin' | 'Customer' | 'Delivery' | 'Operator';
 
 export type OrderStatus =
   | 'PLACED'
@@ -30,7 +30,7 @@ export interface PromoBanner {
   badge: string;
   title: string;
   subtitle: string;
-  type?: 'promo' | 'free';
+  type?: 'promo' | 'free' | string;
 }
 
 export interface ShopPromoCode {
@@ -64,6 +64,8 @@ export interface Shop {
   minOrderValue?: number;
   taxPercent?: number;
   deliveryFee?: number;
+  androidAppUrl?: string;
+  iosAppUrl?: string;
   createdAt: string;
 }
 
@@ -106,14 +108,13 @@ export interface Item {
   isBucket?: boolean; // Bucket items shown as large tappable counter cards
 }
 
-
 export interface OrderItem {
   itemId: string;
   name: string;
   quantity: number;
   unit: 'KG' | 'ITEM';
   price: number; // resolved unit price at order time; 0 for KG items until weighed
-  kgWeight?: number; // weighed by delivery agent
+  kgWeight?: number; // weighed by delivery agent or operator
   categoryName?: string; // category breadcrumb
   subCategoryName?: string; // subcategory breadcrumb
   isBucket?: boolean;
@@ -142,6 +143,7 @@ export interface Order {
   customerAddress: string;
   deliveryBoyId?: string;
   deliveryBoyName?: string;
+  deliveryBoyPhone?: string;
   items: OrderItem[];
   washPreferences?: {
     name: string;
@@ -149,7 +151,7 @@ export interface Order {
   }[];
   status: OrderStatus;
   totalAmount: number;
-  kgPriceUpdated?: boolean; // true once delivery agent has weighed & finalized KG item prices
+  kgPriceUpdated?: boolean; // true once delivery agent / operator has weighed & finalized KG item prices
   taxAmount?: number;
   deliveryFee?: number;
   discountAmount?: number;
@@ -164,6 +166,7 @@ export interface Order {
   deliveryAddress?: string;
   pickupTime?: string;
   adminNotes?: string;
+  instructions?: string;
   createdAt: string;
   updatedAt: string;
 }

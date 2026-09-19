@@ -28,7 +28,12 @@
   },
   "include": [
     "src/**/*",
-    "App.tsx"
+    "App.tsx",
+    "packages/shared/src/**/*",
+    "apps/customer/src/**/*",
+    "apps/customer/App.tsx",
+    "apps/partner/src/**/*",
+    "apps/partner/App.tsx"
   ],
   "extends": "expo/tsconfig.base"
 }

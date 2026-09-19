@@ -125,7 +125,7 @@ export const AdminDashboardScreen: React.FC = () => {
 
   const onlineRevenue = useMemo(() => {
     return filteredOrders
-      .filter((o) => o.status !== 'CANCELLED' && (o.paymentMode === 'UPI' || o.paymentMode === 'CARD' || o.paymentMode === 'ONLINE'))
+      .filter((o) => o.status !== 'CANCELLED' && (o.paymentMode === 'UPI' || o.paymentMode === 'CARD' || (o.paymentMode as any) === 'ONLINE'))
       .reduce((acc, o) => acc + (o.totalAmount || 0), 0);
   }, [filteredOrders]);
 

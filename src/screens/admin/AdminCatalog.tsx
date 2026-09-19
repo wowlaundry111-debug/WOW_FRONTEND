@@ -333,7 +333,7 @@ export const AdminCatalogScreen: React.FC = () => {
                     activeOpacity={0.8}
                     onPress={() => handleStartEditCat(cat)}
                     style={[styles.cardActionIconBtn, { backgroundColor: '#F1F5F9' }]}
-                    title="Edit Category"
+                    accessibilityLabel="Edit Category"
                   >
                     <Edit2 size={15} color={COLORS.black} strokeWidth={2.5} />
                   </TouchableOpacity>
@@ -342,7 +342,7 @@ export const AdminCatalogScreen: React.FC = () => {
                     activeOpacity={0.8}
                     onPress={() => handleDeleteCat(cat)}
                     style={[styles.cardActionIconBtn, { backgroundColor: '#FEE2E2' }]}
-                    title="Delete Category"
+                    accessibilityLabel="Delete Category"
                   >
                     <Trash2 size={15} color="#DC2626" strokeWidth={2.5} />
                   </TouchableOpacity>
@@ -357,7 +357,7 @@ export const AdminCatalogScreen: React.FC = () => {
                       }
                     }}
                     style={[styles.cardActionIconBtn, { backgroundColor: COLORS.secondary }]}
-                    title="Open Category"
+                    accessibilityLabel="Open Category"
                   >
                     <ChevronRight size={16} color={COLORS.black} strokeWidth={3} />
                   </TouchableOpacity>
