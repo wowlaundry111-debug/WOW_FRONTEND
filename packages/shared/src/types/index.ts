@@ -159,7 +159,6 @@ export interface Order {
   couponDiscountPercent?: number;
   couponMaxDiscount?: number;
   couponMinOrderValue?: number;
-
   paymentStatus?: PaymentStatus;
   paymentMode?: PaymentMode;
   pickupAddress?: string;
