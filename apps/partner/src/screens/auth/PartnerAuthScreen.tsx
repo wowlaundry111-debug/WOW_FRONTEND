@@ -16,11 +16,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShieldCheck, Mail, Lock, ArrowRight, Store, Truck, Sparkles, UserCheck } from 'lucide-react-native';
+import { Mail, Lock, ArrowRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 import { useAppStore } from '../../store/useAppStore';
-import { COLORS, SPACING, RADIUS, NEO_SHADOW, Role } from '../../components/Theme';
+import { COLORS, SPACING, RADIUS, NEO_SHADOW } from '../../components/Theme';
 import { WowLogo } from '../../components/WowLogo';
 
 export const PartnerAuthScreen: React.FC = () => {
@@ -29,7 +29,7 @@ export const PartnerAuthScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { sendLoginOtp, setCurrentRole, setCurrentUser } = useAppStore();
+  const { sendLoginOtp } = useAppStore();
 
   const handleLogin = async () => {
     if (!identifier.trim()) {
@@ -62,18 +62,7 @@ export const PartnerAuthScreen: React.FC = () => {
     }
   };
 
-  // Quick Dev Role Preset Switcher for testing
-  const handleDevPreset = (role: Role, name: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setCurrentRole(role);
-    setCurrentUser({
-      _id: `dev-${role.toLowerCase()}-1`,
-      name: `${name} (Dev)`,
-      phone: '+919999999999',
-      role: role,
-      shopId: useAppStore.getState().shops[0]?._id || '',
-    });
-  };
+
 
   return (
     <KeyboardAvoidingView
@@ -143,45 +132,7 @@ export const PartnerAuthScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Development Quick Role Switcher */}
-        {__DEV__ && (
-          <View style={styles.devSection}>
-            <Text style={styles.devHeader}>DEVELOPMENT FAST LOGIN</Text>
-            <View style={styles.devGrid}>
-              <TouchableOpacity
-                style={styles.devBtn}
-                onPress={() => handleDevPreset('ShopAdmin', 'Shop Admin')}
-              >
-                <Store size={18} color={COLORS.black} />
-                <Text style={styles.devBtnText}>Shop Admin</Text>
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.devBtn}
-                onPress={() => handleDevPreset('SuperAdmin', 'Super Admin')}
-              >
-                <ShieldCheck size={18} color={COLORS.black} />
-                <Text style={styles.devBtnText}>Super Admin</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.devBtn}
-                onPress={() => handleDevPreset('Delivery', 'Delivery Boy')}
-              >
-                <Truck size={18} color={COLORS.black} />
-                <Text style={styles.devBtnText}>Delivery</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.devBtn}
-                onPress={() => handleDevPreset('Operator', 'Wash Operator')}
-              >
-                <Sparkles size={18} color={COLORS.black} />
-                <Text style={styles.devBtnText}>Wash Operator</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -295,48 +246,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_800ExtraBold',
     letterSpacing: 0.5,
   },
-  devSection: {
-    width: '100%',
-    maxWidth: 400,
-    marginTop: SPACING.xl,
-    padding: SPACING.md,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  devHeader: {
-    fontSize: 10,
-    fontWeight: '800',
-    fontFamily: 'Outfit_800ExtraBold',
-    letterSpacing: 1,
-    color: COLORS.secondary,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  devGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  devBtn: {
-    flex: 1,
-    minWidth: '45%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.white,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS.md,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    ...NEO_SHADOW.box2,
-  },
-  devBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-    fontFamily: 'Outfit_800ExtraBold',
-    color: COLORS.black,
-  },
+
 });
