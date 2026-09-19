@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import * as React from 'react';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
@@ -15,21 +16,30 @@ const getEntityId = (entity: any): string => {
 const triggerLocalAlert = (title: string, body: string, data?: any) => {
   try {
     if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          sound: true,
-          data: data || {},
-        },
-        trigger: null,
-      }).catch(() => {});
-    } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, {
-        body,
-        icon: '/assets/iconic.png',
-      });
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      } catch {}
+      try {
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            sound: true,
+            data: data || {},
+          },
+          trigger: null,
+        }).catch(() => {});
+      } catch {}
+    } else if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const WebNotification = (window as any).Notification;
+      if (WebNotification && WebNotification.permission === 'granted') {
+        try {
+          new WebNotification(title, {
+            body,
+            icon: '/assets/iconic.png',
+          });
+        } catch {}
+      }
     }
   } catch (err) {
     // Non-blocking
