@@ -21,23 +21,29 @@ config.resolver.extraNodeModules = {
 };
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === 'zustand/middleware') {
-    return {
-      filePath: path.resolve(monorepoRoot, 'node_modules/zustand/middleware.js'),
-      type: 'sourceFile',
-    };
-  }
-  if (moduleName === 'zustand') {
-    return {
-      filePath: path.resolve(monorepoRoot, 'node_modules/zustand/index.js'),
-      type: 'sourceFile',
-    };
-  }
-  if (moduleName === 'zustand/vanilla') {
-    return {
-      filePath: path.resolve(monorepoRoot, 'node_modules/zustand/vanilla.js'),
-      type: 'sourceFile',
-    };
+  if (platform === 'web') {
+    const zustandDir = path.resolve(projectRoot, 'node_modules/zustand');
+    const fallbackDir = path.resolve(monorepoRoot, 'node_modules/zustand');
+    const baseDir = require('fs').existsSync(zustandDir) ? zustandDir : fallbackDir;
+
+    if (moduleName === 'zustand/middleware') {
+      return {
+        filePath: path.resolve(baseDir, 'middleware.js'),
+        type: 'sourceFile',
+      };
+    }
+    if (moduleName === 'zustand') {
+      return {
+        filePath: path.resolve(baseDir, 'index.js'),
+        type: 'sourceFile',
+      };
+    }
+    if (moduleName === 'zustand/vanilla') {
+      return {
+        filePath: path.resolve(baseDir, 'vanilla.js'),
+        type: 'sourceFile',
+      };
+    }
   }
   return context.resolveRequest(context, moduleName, platform);
 };
