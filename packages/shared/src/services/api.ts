@@ -3,20 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const getBaseUrl = (): string => {
-  // In Web environment (Browser), connect directly to the current host or localhost
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-      return `http://${window.location.hostname}:3000/api`;
-    }
-    return 'http://localhost:3000/api';
-  }
-
-  // In Native environment (iOS / Android / Expo Go)
+  // Prioritize EXPO_PUBLIC_API_URL if set (both Web and Native)
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
 
-  return 'http://192.168.1.5:3000/api';
+  // Live production backend default
+  return 'https://wow-backend-isuq.onrender.com/api';
 };
 
 export const BASE_URL = getBaseUrl();

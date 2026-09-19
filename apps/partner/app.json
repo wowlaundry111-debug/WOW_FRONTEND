@@ -29,12 +29,12 @@
       "package": "in.wowlaundry.partner",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
+      "usesCleartextTraffic": true,
+      "allowBackup": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "POST_NOTIFICATIONS"
       ]
     },
     "web": {
