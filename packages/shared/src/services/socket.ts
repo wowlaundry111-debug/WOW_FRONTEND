@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { BASE_URL } from './api';
+import { useAppStore } from '../store/useAppStore';
 
 const socketUrl = BASE_URL.replace('/api', '');
 
@@ -10,11 +11,15 @@ export const socket: Socket = io(socketUrl, {
 
 export const connectSocket = (user?: { _id?: string; shopId?: string; role?: string } | null) => {
   if (user) {
-    socket.io.opts.query = {
+    const userQuery = {
       userId: user._id || '',
       shopId: user.shopId || '',
       role: user.role || '',
     };
+    (socket as any).auth = userQuery;
+    if (socket.io && socket.io.opts) {
+      socket.io.opts.query = userQuery;
+    }
   }
 
   if (!socket.connected) {
@@ -32,7 +37,6 @@ export const connectSocket = (user?: { _id?: string; shopId?: string; role?: str
 // Auto re-join rooms on reconnect
 socket.on('connect', () => {
   try {
-    const { useAppStore } = require('../store/useAppStore');
     const user = useAppStore.getState().currentUser;
     if (user) {
       socket.emit('join', {
@@ -42,7 +46,7 @@ socket.on('connect', () => {
       });
     }
   } catch (e) {
-    // Avoid circular dependency during early initialization
+    // Avoid circular dependency or storage delay during early initialization
   }
 });
 
