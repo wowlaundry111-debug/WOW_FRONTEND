@@ -16,7 +16,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Mail, Lock, ArrowRight } from 'lucide-react-native';
+import { Mail, ArrowRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 import { useAppStore } from '../../store/useAppStore';
@@ -26,7 +26,6 @@ import { WowLogo } from '../../components/WowLogo';
 export const PartnerAuthScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const { sendLoginOtp } = useAppStore();
@@ -40,7 +39,7 @@ export const PartnerAuthScreen: React.FC = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
 
-    const res = await sendLoginOtp(identifier.trim(), password.trim() || undefined);
+    const res = await sendLoginOtp(identifier.trim());
     setLoading(false);
 
     if (!res.success) {
@@ -98,20 +97,6 @@ export const PartnerAuthScreen: React.FC = () => {
               onChangeText={setIdentifier}
               autoCapitalize="none"
               keyboardType="email-address"
-            />
-          </View>
-
-          {/* Password */}
-          <Text style={[styles.label, { marginTop: SPACING.md }]}>PASSWORD</Text>
-          <View style={styles.inputWrap}>
-            <Lock size={18} color={COLORS.black} strokeWidth={2.5} />
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              placeholderTextColor="#9CA3AF"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
             />
           </View>
 
