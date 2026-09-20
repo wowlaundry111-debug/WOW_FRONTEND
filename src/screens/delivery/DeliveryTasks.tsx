@@ -13,8 +13,9 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 import { useAppStore } from '../../store/useAppStore';
-import { Order } from '../../types';
+import type { Order } from '../../types';
 import { DeliveryTaskSkeleton } from '../../components/SkeletonLoaders';
+import { NotificationBell } from '../../components/NotificationBell';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedView = Animated.View as any;
@@ -283,7 +284,7 @@ const WeighKgModal = ({
       order.items.forEach((it) => {
         const isKg = it.unit === 'KG' || (typeof it.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) || Boolean(it.kgWeight && it.kgWeight > 0);
         if (isKg) {
-          initial[it.itemId] = it.kgWeight ? String(it.kgWeight) : '1.0';
+          initial[it.itemId] = (it.kgWeight !== undefined && it.kgWeight !== null && it.kgWeight > 0) ? String(it.kgWeight) : '';
         }
       });
       setWeights(initial);
@@ -299,11 +300,11 @@ const WeighKgModal = ({
     let sum = 0;
     kgItems.forEach(it => {
       const catItem = catalogItems.find(c => c._id === it.itemId || c.name === it.name);
-      const rate = catItem?.pricePerKg || (catItem as any)?.price || 60;
+      const rate = catItem?.pricePerKg || (catItem as any)?.price || (it.unit === 'KG' && it.price > 0 && !it.kgWeight ? it.price : 0) || 60;
       const w = parseFloat(weights[it.itemId] || '0') || 0;
-      sum += w * rate;
+      sum += Math.round(w * rate * 100) / 100;
     });
-    return sum;
+    return Math.round(sum * 100) / 100;
   };
 
   const handleSave = async (andConfirmPickup = false) => {
@@ -343,9 +344,9 @@ const WeighKgModal = ({
 
             {kgItems.map((it) => {
               const catItem = catalogItems.find(c => c._id === it.itemId || c.name === it.name);
-              const rate = catItem?.pricePerKg || (catItem as any)?.price || 60;
+              const rate = catItem?.pricePerKg || (catItem as any)?.price || (it.unit === 'KG' && it.price > 0 && !it.kgWeight ? it.price : 0) || 60;
               const w = parseFloat(weights[it.itemId] || '0') || 0;
-              const lineTotal = w * rate;
+              const lineTotal = Math.round(w * rate * 100) / 100;
 
               return (
                 <View key={it.itemId} style={[styles.verifyRow, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
@@ -366,7 +367,7 @@ const WeighKgModal = ({
                       <TouchableOpacity
                         onPress={() => {
                           const curr = parseFloat(weights[it.itemId] || '0') || 0;
-                          const next = Math.max(0.5, curr - 0.5);
+                          const next = Math.max(0.5, Math.round((curr - 0.5) * 10) / 10);
                           setWeights(p => ({ ...p, [it.itemId]: next.toFixed(1) }));
                         }}
                         style={styles.stepperBtn}
@@ -376,14 +377,21 @@ const WeighKgModal = ({
                       <TextInput
                         keyboardType="decimal-pad"
                         style={{ width: 60, textAlign: 'center', fontWeight: '900', fontSize: 16, color: COLORS.black }}
-                        value={weights[it.itemId] || '1.0'}
-                        onChangeText={(t) => setWeights(p => ({ ...p, [it.itemId]: t }))}
+                        value={weights[it.itemId] ?? ''}
+                        placeholder="0.00"
+                        placeholderTextColor="#9CA3AF"
+                        onChangeText={(t) => {
+                          const clean = t.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                          const parts = clean.split('.');
+                          const formatted = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean;
+                          setWeights(p => ({ ...p, [it.itemId]: formatted }));
+                        }}
                       />
                       <Text style={{ fontWeight: '800', fontSize: 13, color: '#6B7280' }}>KG</Text>
                       <TouchableOpacity
                         onPress={() => {
                           const curr = parseFloat(weights[it.itemId] || '0') || 0;
-                          const next = curr + 0.5;
+                          const next = Math.round((curr + 0.5) * 10) / 10;
                           setWeights(p => ({ ...p, [it.itemId]: next.toFixed(1) }));
                         }}
                         style={styles.stepperBtn}
@@ -393,7 +401,7 @@ const WeighKgModal = ({
                     </View>
 
                     <Text style={{ fontSize: 14, fontWeight: '900', color: COLORS.black, marginLeft: 'auto' }}>
-                      = ₹{lineTotal.toFixed(0)}
+                      = ₹{lineTotal}
                     </Text>
                   </View>
                 </View>
@@ -721,6 +729,32 @@ export const DeliveryTasksScreen = () => {
     }
   };
 
+  const handleNavigateGps = async (order: Order) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const address = order.deliveryAddress;
+    if (!address || address.trim() === '' || address.toLowerCase() === 'no address specified') {
+      Alert.alert('No Address', 'This order has no delivery address registered.');
+      return;
+    }
+    const cleanAddr = encodeURIComponent(address.replace(/\((Home|Work|Other)\)/i, '').trim());
+    const navUrl = Platform.select({
+      ios: `maps:0,0?q=${cleanAddr}`,
+      android: `google.navigation:q=${cleanAddr}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${cleanAddr}`,
+    });
+
+    try {
+      const canOpen = await Linking.canOpenURL(navUrl!);
+      if (canOpen) {
+        await Linking.openURL(navUrl!);
+      } else {
+        await Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${cleanAddr}`);
+      }
+    } catch {
+      await Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${cleanAddr}`);
+    }
+  };
+
   return (
     <View style={styles.root}>
       {/* Top overscroll filler for iOS pull-down */}
@@ -761,10 +795,13 @@ export const DeliveryTasksScreen = () => {
             </Text>
           </View>
 
-          {/* Shift Icon Pill */}
-          <View style={styles.shiftPill}>
-            <Truck size={14} color={COLORS.black} strokeWidth={2.5} />
-            <Text style={styles.shiftPillText}>RIDER</Text>
+          {/* Shift Icon Pill & Notification Bell */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <NotificationBell color={COLORS.white} />
+            <View style={styles.shiftPill}>
+              <Truck size={14} color={COLORS.black} strokeWidth={2.5} />
+              <Text style={styles.shiftPillText}>RIDER</Text>
+            </View>
           </View>
         </View>
 
@@ -893,8 +930,18 @@ export const DeliveryTasksScreen = () => {
             return (
             <View key={`${order._id}-${orderIdx}`} style={styles.taskCard}>
               <View style={styles.taskCardHeader}>
-                <View style={styles.orderIdBadge}>
-                  <Text style={styles.orderIdText}>#{order._id.slice(-6).toUpperCase()}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <View style={styles.orderIdBadge}>
+                    <Text style={styles.orderIdText}>#{order._id.slice(-6).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ backgroundColor: COLORS.black, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '900', color: '#B0FF49' }}>WOW LAUNDRY</Text>
+                  </View>
+                  {order.isWalkIn ? (
+                    <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black }}>
+                      <Text style={{ fontSize: 9, fontWeight: '900', color: '#854D0E' }}>ON-BRANCH</Text>
+                    </View>
+                  ) : null}
                 </View>
                 <View style={styles.priceBadge}>
                   <Text style={styles.orderAmount}>₹{order.totalAmount || 0}</Text>
@@ -924,13 +971,21 @@ export const DeliveryTasksScreen = () => {
                 </View>
               )}
 
-              {/* Address Box */}
-              <View style={styles.addressBox}>
+              {/* Address Box with Turn-by-Turn GPS Navigation Action */}
+              <TouchableOpacity
+                style={styles.addressBox}
+                activeOpacity={0.7}
+                onPress={() => handleNavigateGps(order)}
+              >
                 <MapPin size={16} color={COLORS.black} strokeWidth={2.5} />
                 <Text style={styles.addressText} numberOfLines={2}>
                   {order.deliveryAddress || 'No address specified'}
                 </Text>
-              </View>
+                <View style={styles.gpsBadge}>
+                  <Navigation size={10} color="#FFFFFF" strokeWidth={2.5} />
+                  <Text style={styles.gpsBadgeText}>NAVIGATE</Text>
+                </View>
+              </TouchableOpacity>
 
               {/* KG Status Banner / Action */}
               {(() => {
@@ -1397,6 +1452,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.black,
+  },
+  gpsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.xs,
+    gap: 4,
+  },
+  gpsBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   actionRow: {
     flexDirection: 'row',

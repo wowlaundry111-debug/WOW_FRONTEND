@@ -165,6 +165,7 @@ export interface Order {
   deliveryAddress?: string;
   pickupTime?: string;
   adminNotes?: string;
+  isWalkIn?: boolean;
   instructions?: string;
   createdAt: string;
   updatedAt: string;

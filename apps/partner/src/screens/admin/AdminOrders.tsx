@@ -16,8 +16,6 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import {
-  User,
-  Clock,
   ChevronRight,
   Truck,
   MapPin,
@@ -30,17 +28,17 @@ import {
   Filter,
   CreditCard,
   Sparkles,
-  Package,
   Scale,
   Trash2,
   Banknote,
   Smartphone,
   AlertTriangle,
   Wifi,
+  Store,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
-import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
+import { COLORS, SPACING, RADIUS, NEO_SHADOW } from '../../components/Theme';
 import { StatusBadge } from '../../components/UIPack';
 import { useAppStore } from '../../store/useAppStore';
 import { downloadOrdersCsv } from '../../utils/exportCsv';
@@ -102,7 +100,7 @@ const WeighKgModal: React.FC<WeighKgModalProps> = ({
       const initial: Record<string, string> = {};
       (order.items || []).forEach((it) => {
         if (isKgCheck(it)) {
-          initial[it.itemId] = (it.kgWeight !== undefined && it.kgWeight !== null && it.kgWeight > 0) ? String(it.kgWeight) : '1.0';
+          initial[it.itemId] = (it.kgWeight !== undefined && it.kgWeight !== null && it.kgWeight > 0) ? String(it.kgWeight) : '';
         }
       });
       setWeights(initial);
@@ -119,9 +117,9 @@ const WeighKgModal: React.FC<WeighKgModalProps> = ({
       const catItem = (catalogItems || []).find((c) => String(c._id) === String(it.itemId) || c.name === it.name);
       const rate = catItem?.pricePerKg || (it.unit === 'KG' && it.price > 0 && !it.kgWeight ? it.price : 0) || 60;
       const w = parseFloat(weights[it.itemId] || '0') || 0;
-      sum += w * rate;
+      sum += Math.round(w * rate * 100) / 100;
     });
-    return sum;
+    return Math.round(sum * 100) / 100;
   };
 
   const handleSave = async (andConfirmPickup = false) => {
@@ -223,8 +221,15 @@ const WeighKgModal: React.FC<WeighKgModalProps> = ({
                       <TextInput
                         keyboardType="decimal-pad"
                         style={styles.weighInput}
-                        value={weights[it.itemId] || '1.0'}
-                        onChangeText={(t) => setWeights((p) => ({ ...p, [it.itemId]: t }))}
+                        value={weights[it.itemId] ?? ''}
+                        placeholder="0.00"
+                        placeholderTextColor="#9CA3AF"
+                        onChangeText={(t) => {
+                          const clean = t.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                          const parts = clean.split('.');
+                          const formatted = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean;
+                          setWeights((p) => ({ ...p, [it.itemId]: formatted }));
+                        }}
                       />
                       <Text style={{ fontWeight: '800', fontSize: 12, color: '#6B7280' }}>KG</Text>
                       <TouchableOpacity
@@ -473,8 +478,23 @@ export const AdminOrdersScreen: React.FC = () => {
   const [editNotes, setEditNotes] = useState('');
 
   const modalCustomer = selectedOrder ? users.find((u) => u._id === selectedOrder.customerId) : null;
-  const modalCustomerName = modalCustomer?.name || selectedOrder?.customerName || 'Customer';
-  const modalCustomerPhone = modalCustomer?.phone || selectedOrder?.customerPhone || '';
+  const isModalStaffAccount = modalCustomer?.role === 'ShopAdmin' || modalCustomer?.role === 'SuperAdmin' || (modalCustomer?.email || '').toLowerCase().includes('wowlaundry') || (modalCustomer?.name || '').toLowerCase().includes('wow laundry');
+  const isModalBranchOrder = Boolean(
+    selectedOrder?.isWalkIn ||
+    selectedOrder?.adminNotes?.toLowerCase().includes('branch') ||
+    selectedOrder?.adminNotes?.toLowerCase().includes('walk-in') ||
+    selectedOrder?.deliveryAddress?.toLowerCase().includes('branch') ||
+    selectedOrder?.deliveryAddress?.toLowerCase().includes('walk-in') ||
+    selectedOrder?.deliveryAddress?.toLowerCase().includes('in-store') ||
+    (isModalStaffAccount && selectedOrder?.customerName && selectedOrder?.customerName !== modalCustomer?.name)
+  );
+
+  const modalCustomerName = (selectedOrder?.customerName && selectedOrder?.customerName !== 'Unknown Customer' && selectedOrder?.customerName !== 'Customer')
+    ? selectedOrder.customerName
+    : (modalCustomer?.name || selectedOrder?.customerName || 'Customer');
+  const modalCustomerPhone = (selectedOrder?.customerPhone && selectedOrder?.customerPhone !== 'N/A' && selectedOrder?.customerPhone.trim() !== '')
+    ? selectedOrder.customerPhone
+    : (modalCustomer?.phone || selectedOrder?.customerPhone || '');
 
   const itemsByCat = useMemo(() => {
     if (!selectedOrder?.items) return {};
@@ -503,9 +523,35 @@ export const AdminOrdersScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'price_high' | 'price_low' | 'customer'>('newest');
 
   const currentFilterConfig = FILTERS.find((f) => f.key === activeFilter) || FILTERS[0];
-  const filteredOrders = tenantOrders.filter((o) =>
-    currentFilterConfig.statuses.includes(o.status)
-  );
+  const filteredOrders = tenantOrders.filter((o) => {
+    const isBranch = Boolean(
+      o.isWalkIn ||
+      o.adminNotes?.toLowerCase().includes('branch') ||
+      o.adminNotes?.toLowerCase().includes('walk-in') ||
+      o.customerAddress?.toLowerCase().includes('branch') ||
+      o.customerAddress?.toLowerCase().includes('walk-in') ||
+      o.customerAddress?.toLowerCase().includes('in-store') ||
+      o.customerAddress?.toLowerCase().includes('counter') ||
+      o.customerAddress?.toLowerCase().includes('drop-off') ||
+      o.deliveryAddress?.toLowerCase().includes('branch') ||
+      o.deliveryAddress?.toLowerCase().includes('walk-in') ||
+      o.deliveryAddress?.toLowerCase().includes('in-store') ||
+      o.deliveryAddress?.toLowerCase().includes('counter') ||
+      o.deliveryAddress?.toLowerCase().includes('drop-off')
+    );
+
+    // On-branch / walk-in orders NEVER belong in 'new' (New Orders) queue
+    if (activeFilter === 'new' && isBranch) {
+      return false;
+    }
+
+    // On-branch orders immediately belong in 'washing' (In Wash Cycle)
+    if (activeFilter === 'washing' && isBranch && ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED', 'PICKED_UP', 'WASHING', 'IRONING'].includes(o.status)) {
+      return true;
+    }
+
+    return currentFilterConfig.statuses.includes(o.status);
+  });
 
   const sortedOrders = useMemo(() => {
     const list = [...filteredOrders];
@@ -713,8 +759,23 @@ export const AdminOrdersScreen: React.FC = () => {
       >
         {sortedOrders.map((order) => {
           const customer = users.find((u) => u._id === order.customerId);
-          const customerName = customer?.name || order.customerName || 'Customer';
-          const customerPhone = customer?.phone || order.customerPhone || '';
+          const isStaffAccount = customer?.role === 'ShopAdmin' || customer?.role === 'SuperAdmin' || (customer?.email || '').toLowerCase().includes('wowlaundry') || (customer?.name || '').toLowerCase().includes('wow laundry');
+          const isBranchOrder = Boolean(
+            order.isWalkIn ||
+            order.adminNotes?.toLowerCase().includes('branch') ||
+            order.adminNotes?.toLowerCase().includes('walk-in') ||
+            order.deliveryAddress?.toLowerCase().includes('branch') ||
+            order.deliveryAddress?.toLowerCase().includes('walk-in') ||
+            order.deliveryAddress?.toLowerCase().includes('in-store') ||
+            (isStaffAccount && order.customerName && order.customerName !== customer?.name)
+          );
+
+          const customerName = (order.customerName && order.customerName !== 'Unknown Customer' && order.customerName !== 'Customer')
+            ? order.customerName
+            : (customer?.name || order.customerName || 'Customer');
+          const customerPhone = (order.customerPhone && order.customerPhone !== 'N/A' && order.customerPhone.trim() !== '')
+            ? order.customerPhone
+            : (customer?.phone || order.customerPhone || '');
           const assignedBoy = users.find((u) => u._id === order.deliveryBoyId);
 
           return (
@@ -726,10 +787,21 @@ export const AdminOrdersScreen: React.FC = () => {
             >
               {/* Top Row: Order ID + Status & Delete */}
               <View style={styles.orderCardTop}>
-                <View style={styles.orderIdBadge}>
-                  <Text style={styles.orderIdText}>
-                    #{order._id.slice(-6).toUpperCase()}
-                  </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <View style={styles.orderIdBadge}>
+                    <Text style={styles.orderIdText}>
+                      #{order._id.slice(-6).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.branchHeadPill}>
+                    <Store size={10} color="#B0FF49" strokeWidth={2.5} />
+                    <Text style={styles.branchHeadPillText}>WOW LAUNDRY</Text>
+                  </View>
+                  {isBranchOrder ? (
+                    <View style={styles.walkInBadgePill}>
+                      <Text style={styles.walkInBadgePillText}>ON-BRANCH</Text>
+                    </View>
+                  ) : null}
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <StatusBadge status={order.status} />
@@ -754,6 +826,9 @@ export const AdminOrdersScreen: React.FC = () => {
                   <Text style={styles.customerName}>{customerName}</Text>
                   {customerPhone ? (
                     <Text style={styles.customerPhone}>+91 {customerPhone}</Text>
+                  ) : null}
+                  {isBranchOrder ? (
+                    <Text style={styles.branchWalkInTag}>Walk-in Counter Customer</Text>
                   ) : null}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
@@ -813,7 +888,7 @@ export const AdminOrdersScreen: React.FC = () => {
                         <View style={styles.catItemsList}>
                           {catItems.map((it: any, idx: number) => {
                             const isKg = it.unit === 'KG' || (typeof it.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) || Boolean(it.kgWeight && it.kgWeight > 0);
-                            const linePrice = (it.price || 0) * (isKg ? (it.kgWeight || 1) : it.quantity);
+                            const linePrice = isKg ? Math.round((it.price || 0) * 100) / 100 : (it.price || 0) * (it.quantity || 1);
                             return (
                               <View key={`${it.itemId || idx}-${idx}`} style={[styles.catItemRow, idx > 0 && styles.catItemDivider]}>
                                 <View style={{ flex: 1, paddingRight: 8 }}>
@@ -893,96 +968,117 @@ export const AdminOrdersScreen: React.FC = () => {
 
               {/* Action Buttons Row */}
               <View style={styles.cardActionsRow}>
-                {order.status === 'PLACED' && (
+                {isBranchOrder && ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED', 'PICKED_UP'].includes(order.status) ? (
                   <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
                     <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: COLORS.secondary, flex: 1 }]}
-                      onPress={() => handleStatusChange(order._id, 'ACCEPTED')}
+                      style={[styles.actionBtn, { backgroundColor: '#FDE047', flex: 1 }]}
+                      onPress={() => handleStatusChange(order._id, 'WASHING')}
                     >
-                      <Text style={styles.actionBtnText}>ACCEPT ORDER</Text>
+                      <Text style={styles.actionBtnText}>START WASHING</Text>
                     </TouchableOpacity>
                     {order.items?.some(isKgCheck) && (
                       <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
+                        style={[styles.actionBtn, { backgroundColor: '#B0FF49', paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center' }]}
                         onPress={() => setWeighModalOrder(order)}
                       >
-                        <Scale size={14} color={COLORS.black} />
-                        <Text style={[styles.actionBtnText, { color: COLORS.black }]}>WEIGH & PICK UP</Text>
+                        <Scale size={16} color={COLORS.black} />
                       </TouchableOpacity>
                     )}
                   </View>
-                )}
+                ) : (
+                  <>
+                    {order.status === 'PLACED' && (
+                      <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: COLORS.secondary, flex: 1 }]}
+                          onPress={() => handleStatusChange(order._id, 'ACCEPTED')}
+                        >
+                          <Text style={styles.actionBtnText}>ACCEPT ORDER</Text>
+                        </TouchableOpacity>
+                        {order.items?.some(isKgCheck) && (
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
+                            onPress={() => setWeighModalOrder(order)}
+                          >
+                            <Scale size={14} color={COLORS.black} />
+                            <Text style={[styles.actionBtnText, { color: COLORS.black }]}>WEIGH & PICK UP</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
 
-                {order.status === 'ACCEPTED' && (
-                  <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
-                    {order.items?.some(isKgCheck) && (
+                    {order.status === 'ACCEPTED' && (
+                      <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
+                        {order.items?.some(isKgCheck) && (
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
+                            onPress={() => setWeighModalOrder(order)}
+                          >
+                            <Scale size={14} color={COLORS.black} />
+                            <Text style={[styles.actionBtnText, { color: COLORS.black }]}>WEIGH & PICK UP</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
+                          onPress={() => setAssignModalOrder(order)}
+                        >
+                          <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                            {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'ASSIGN PICKUP'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {order.status === 'PICKUP_ASSIGNED' && (
+                      <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
+                        {order.items?.some(isKgCheck) && !order.kgPriceUpdated ? (
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
+                            onPress={() => setWeighModalOrder(order)}
+                          >
+                            <Scale size={14} color={COLORS.black} />
+                            <Text style={[styles.actionBtnText, { color: COLORS.black }]}>
+                              WEIGH & PICK UP
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]}
+                            onPress={() => handleStatusChange(order._id, 'PICKED_UP')}
+                          >
+                            <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                              MARK PICKED UP
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        {order.items?.some(isKgCheck) && (
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#FEF08A', paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center' }]}
+                            onPress={() => setWeighModalOrder(order)}
+                          >
+                            <Scale size={14} color={COLORS.black} />
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
+                          onPress={() => setAssignModalOrder(order)}
+                        >
+                          <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
+                            {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'REASSIGN'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {order.status === 'PICKED_UP' && (
                       <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
-                        onPress={() => setWeighModalOrder(order)}
+                        style={[styles.actionBtn, { backgroundColor: '#FDE047' }]}
+                        onPress={() => handleStatusChange(order._id, 'WASHING')}
                       >
-                        <Scale size={14} color={COLORS.black} />
-                        <Text style={[styles.actionBtnText, { color: COLORS.black }]}>WEIGH & PICK UP</Text>
+                        <Text style={styles.actionBtnText}>START WASHING</Text>
                       </TouchableOpacity>
                     )}
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
-                      onPress={() => setAssignModalOrder(order)}
-                    >
-                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
-                        {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'ASSIGN PICKUP'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {order.status === 'PICKUP_ASSIGNED' && (
-                  <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
-                    {order.items?.some(isKgCheck) && !order.kgPriceUpdated ? (
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#B0FF49', flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }]}
-                        onPress={() => setWeighModalOrder(order)}
-                      >
-                        <Scale size={14} color={COLORS.black} />
-                        <Text style={[styles.actionBtnText, { color: COLORS.black }]}>
-                          WEIGH & PICK UP
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]}
-                        onPress={() => handleStatusChange(order._id, 'PICKED_UP')}
-                      >
-                        <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
-                          MARK PICKED UP
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    {order.items?.some(isKgCheck) && (
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#FEF08A', paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center' }]}
-                        onPress={() => setWeighModalOrder(order)}
-                      >
-                        <Scale size={14} color={COLORS.black} />
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: COLORS.primary, flex: 1 }]}
-                      onPress={() => setAssignModalOrder(order)}
-                    >
-                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>
-                        {assignedBoy ? `REASSIGN (${assignedBoy.name.split(' ')[0]})` : 'REASSIGN'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {order.status === 'PICKED_UP' && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: '#FDE047' }]}
-                    onPress={() => handleStatusChange(order._id, 'WASHING')}
-                  >
-                    <Text style={styles.actionBtnText}>START WASHING</Text>
-                  </TouchableOpacity>
+                  </>
                 )}
 
                 {order.status === 'WASHING' && (
@@ -1140,7 +1236,7 @@ export const AdminOrdersScreen: React.FC = () => {
                           <View style={styles.catItemsList}>
                             {catItems.map((it: any, idx: number) => {
                               const isKg = it.unit === 'KG' || (typeof it.name === 'string' && (it.name.toLowerCase().includes('per kg') || it.name.toLowerCase().includes('/ kg'))) || Boolean(it.kgWeight && it.kgWeight > 0);
-                              const linePrice = (it.price || 0) * (isKg ? (it.kgWeight || 1) : it.quantity);
+                              const linePrice = isKg ? Math.round((it.price || 0) * 100) / 100 : (it.price || 0) * (it.quantity || 1);
                               return (
                                 <View key={`${it.itemId || idx}-${idx}`} style={[styles.catItemRow, idx > 0 && styles.catItemDivider]}>
                                   <View style={{ flex: 1, paddingRight: 8 }}>
@@ -1277,11 +1373,24 @@ export const AdminOrdersScreen: React.FC = () => {
                     <View style={{ padding: 12, gap: 10 }}>
                       {/* Customer Contact Card */}
                       <View style={styles.detailBox}>
-                        <Text style={styles.detailBoxLabel}>CUSTOMER CONTACT</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <Text style={styles.detailBoxLabel}>
+                            {isModalBranchOrder ? 'BRANCH WALK-IN CUSTOMER' : 'CUSTOMER CONTACT'}
+                          </Text>
+                          <View style={styles.branchHeadPillSmall}>
+                            <Store size={9} color="#B0FF49" strokeWidth={2.5} />
+                            <Text style={styles.branchHeadPillSmallText}>WOW LAUNDRY</Text>
+                          </View>
+                        </View>
                         <Text style={styles.customerDetailName}>{modalCustomerName}</Text>
                         <Text style={styles.customerDetailPhone}>
                           {modalCustomerPhone ? `+91 ${modalCustomerPhone}` : 'No phone provided'}
                         </Text>
+                        {isModalBranchOrder ? (
+                          <Text style={styles.modalBranchTag}>
+                            ✓ On-branch order: Walk-in customer registered at branch counter
+                          </Text>
+                        ) : null}
                         
                         {modalCustomerPhone ? (
                           <View style={styles.contactActionRow}>
@@ -2566,5 +2675,69 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_800ExtraBold',
     letterSpacing: 0.5,
     textAlign: 'center',
+  },
+  branchHeadPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.black,
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    ...NEO_SHADOW.box2,
+  },
+  branchHeadPillText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#B0FF49',
+    letterSpacing: 0.5,
+  },
+  walkInBadgePill: {
+    backgroundColor: '#FEF08A',
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  walkInBadgePillText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#854D0E',
+    letterSpacing: 0.5,
+  },
+  branchWalkInTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#0D8DE3',
+    marginTop: 2,
+  },
+  branchHeadPillSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: COLORS.black,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  branchHeadPillSmallText: {
+    fontSize: 8,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#B0FF49',
+    letterSpacing: 0.4,
+  },
+  modalBranchTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#0D8DE3',
+    marginTop: 4,
   },
 });

@@ -27,11 +27,8 @@ import {
   Search,
   Scale,
   X,
-  ChevronRight,
-  Truck,
   Layers,
   ArrowRight,
-  Filter,
   LogOut,
   Phone,
   FileText,
@@ -96,12 +93,30 @@ export const OperatorPortal: React.FC = () => {
     setRefreshing(false);
   }, [fetchOrders]);
 
+  const isBranchOrder = (o: Order) => Boolean(
+    o.isWalkIn ||
+    o.adminNotes?.toLowerCase().includes('branch') ||
+    o.adminNotes?.toLowerCase().includes('walk-in') ||
+    o.customerAddress?.toLowerCase().includes('branch') ||
+    o.customerAddress?.toLowerCase().includes('walk-in') ||
+    o.customerAddress?.toLowerCase().includes('in-store') ||
+    o.customerAddress?.toLowerCase().includes('counter') ||
+    o.customerAddress?.toLowerCase().includes('drop-off') ||
+    o.deliveryAddress?.toLowerCase().includes('branch') ||
+    o.deliveryAddress?.toLowerCase().includes('walk-in') ||
+    o.deliveryAddress?.toLowerCase().includes('in-store') ||
+    o.deliveryAddress?.toLowerCase().includes('counter') ||
+    o.deliveryAddress?.toLowerCase().includes('drop-off')
+  );
+
   // Orders on wash floor (Picked up, Washing, Ironing, Out for delivery/Ready)
   const floorOrders = useMemo(() => {
     return (orders || []).filter(o => {
       if (!o || !o._id) return false;
       if (effectiveShopId && o.shopId !== effectiveShopId) return false;
-      return ['PICKED_UP', 'WASHING', 'IRONING', 'OUT_FOR_DELIVERY'].includes(o.status);
+      if (['PICKED_UP', 'WASHING', 'IRONING', 'OUT_FOR_DELIVERY'].includes(o.status)) return true;
+      if (isBranchOrder(o) && ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED'].includes(o.status)) return true;
+      return false;
     });
   }, [orders, effectiveShopId]);
 
@@ -109,7 +124,7 @@ export const OperatorPortal: React.FC = () => {
   const counts = useMemo(() => {
     return {
       all: floorOrders.length,
-      pickedUp: floorOrders.filter(o => o.status === 'PICKED_UP').length,
+      pickedUp: floorOrders.filter(o => o.status === 'PICKED_UP' || ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED'].includes(o.status)).length,
       washing: floorOrders.filter(o => o.status === 'WASHING').length,
       ironing: floorOrders.filter(o => o.status === 'IRONING').length,
       ready: floorOrders.filter(o => o.status === 'OUT_FOR_DELIVERY').length,
@@ -120,7 +135,11 @@ export const OperatorPortal: React.FC = () => {
   const filteredOrders = useMemo(() => {
     let list = floorOrders;
     if (activeTab !== 'ALL') {
-      list = list.filter(o => o.status === activeTab);
+      if (activeTab === 'PICKED_UP') {
+        list = list.filter(o => o.status === 'PICKED_UP' || ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED'].includes(o.status));
+      } else {
+        list = list.filter(o => o.status === activeTab);
+      }
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -138,7 +157,7 @@ export const OperatorPortal: React.FC = () => {
     let nextStatus: OrderStatus | null = null;
     let confirmMsg = '';
 
-    if (order.status === 'PICKED_UP') {
+    if (order.status === 'PICKED_UP' || ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED'].includes(order.status)) {
       nextStatus = 'WASHING';
       confirmMsg = `Start wash cycle for Order #${order._id.slice(-5)}?`;
     } else if (order.status === 'WASHING') {
@@ -183,7 +202,8 @@ export const OperatorPortal: React.FC = () => {
   // KG Weight Submission Handler
   const handleSaveWeight = async () => {
     if (!weightModalOrder) return;
-    const wt = parseFloat(inputWeight);
+    const clean = inputWeight.replace(/,/g, '.');
+    const wt = parseFloat(clean);
     if (isNaN(wt) || wt <= 0) {
       Alert.alert('Invalid Weight', 'Please enter a valid weight in kilograms');
       return;
@@ -238,8 +258,18 @@ export const OperatorPortal: React.FC = () => {
       >
         {/* Header */}
         <View style={styles.cardHeader}>
-          <View style={styles.tokenPill}>
-            <Text style={styles.tokenText}>#{item._id.slice(-5).toUpperCase()}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <View style={styles.tokenPill}>
+              <Text style={styles.tokenText}>#{item._id.slice(-5).toUpperCase()}</Text>
+            </View>
+            <View style={{ backgroundColor: COLORS.black, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+              <Text style={{ fontSize: 9, fontWeight: '900', color: '#B0FF49' }}>WOW LAUNDRY</Text>
+            </View>
+            {item.isWalkIn ? (
+              <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black }}>
+                <Text style={{ fontSize: 9, fontWeight: '900', color: '#854D0E' }}>ON-BRANCH</Text>
+              </View>
+            ) : null}
           </View>
           <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
             <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.label}</Text>
@@ -263,8 +293,9 @@ export const OperatorPortal: React.FC = () => {
                 <TouchableOpacity
                   style={styles.weighBtn}
                   onPress={() => {
+                    const existingWt = item.items?.find((i: any) => i.kgWeight && Number(i.kgWeight) > 0)?.kgWeight;
                     setWeightModalOrder(item);
-                    setInputWeight('');
+                    setInputWeight(existingWt ? String(existingWt) : '');
                   }}
                 >
                   <Text style={styles.weighBtnText}>Weigh Now</Text>
@@ -287,7 +318,7 @@ export const OperatorPortal: React.FC = () => {
 
         {/* Action Progression Button */}
         <View style={styles.cardFooter}>
-          {item.status === 'PICKED_UP' && (
+          {(item.status === 'PICKED_UP' || ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED'].includes(item.status)) && (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#3B82F6' }]}
               disabled={isUpdating}
@@ -486,8 +517,18 @@ export const OperatorPortal: React.FC = () => {
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalToken}>ORDER #{selectedOrder?._id.slice(-5).toUpperCase()}</Text>
-                <Text style={styles.modalCust}>{selectedOrder?.customerName}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+                  <Text style={styles.modalToken}>ORDER #{selectedOrder?._id.slice(-5).toUpperCase()}</Text>
+                  <View style={{ backgroundColor: COLORS.black, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '900', color: '#B0FF49' }}>WOW LAUNDRY</Text>
+                  </View>
+                  {selectedOrder?.isWalkIn ? (
+                    <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: COLORS.black }}>
+                      <Text style={{ fontSize: 9, fontWeight: '900', color: '#854D0E' }}>ON-BRANCH</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.modalCust}>{selectedOrder?.customerName || 'Walk-in Customer'}</Text>
               </View>
               <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.closeBtn}>
                 <X size={20} color={COLORS.black} />
@@ -559,9 +600,10 @@ export const OperatorPortal: React.FC = () => {
                   style={styles.modalWeighBtn}
                   onPress={() => {
                     const o = selectedOrder;
+                    const existingWt = o?.items?.find((i: any) => i.kgWeight && Number(i.kgWeight) > 0)?.kgWeight;
                     setSelectedOrder(null);
                     setWeightModalOrder(o);
-                    setInputWeight('');
+                    setInputWeight(existingWt ? String(existingWt) : '');
                   }}
                   activeOpacity={0.85}
                 >
@@ -570,7 +612,7 @@ export const OperatorPortal: React.FC = () => {
                 </TouchableOpacity>
               )}
 
-              {selectedOrder && ['PICKED_UP', 'WASHING', 'IRONING'].includes(selectedOrder.status) && (
+              {selectedOrder && ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED', 'PICKED_UP', 'WASHING', 'IRONING'].includes(selectedOrder.status) && (
                 <TouchableOpacity
                   style={[styles.modalActionBtn, { backgroundColor: COLORS.black }]}
                   onPress={() => {
@@ -601,10 +643,16 @@ export const OperatorPortal: React.FC = () => {
             <View style={styles.weightInputWrap}>
               <TextInput
                 style={styles.weightInput}
-                placeholder="0.0"
+                placeholder="0.00"
+                placeholderTextColor="#9CA3AF"
                 keyboardType="decimal-pad"
                 value={inputWeight}
-                onChangeText={setInputWeight}
+                onChangeText={(t) => {
+                  const clean = t.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                  const parts = clean.split('.');
+                  const formatted = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean;
+                  setInputWeight(formatted);
+                }}
                 autoFocus
               />
               <Text style={styles.weightUnit}>KG</Text>

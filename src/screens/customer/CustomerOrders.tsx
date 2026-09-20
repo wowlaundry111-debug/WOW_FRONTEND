@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
-import { Package, Clock, Phone, PhoneCall, MessageCircle, XCircle, User, Scale, AlertTriangle } from 'lucide-react-native';
+import { Package, Clock, Phone, PhoneCall, MessageCircle, XCircle, User, Scale, AlertTriangle, Store } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, TYPO, NEO_SHADOW } from '../../components/Theme';
 import { useAppStore } from '../../store/useAppStore';
 import { StatusBadge } from '../../components/UIPack';
@@ -333,16 +333,36 @@ export const CustomerOrdersScreen = () => {
               })();
 
               const safeItems = Array.isArray(order.items) ? order.items : [];
+              const isBranchOrder = Boolean(
+                order.isWalkIn ||
+                order.adminNotes?.toLowerCase().includes('branch') ||
+                order.adminNotes?.toLowerCase().includes('walk-in') ||
+                order.deliveryAddress?.toLowerCase().includes('branch') ||
+                order.deliveryAddress?.toLowerCase().includes('walk-in') ||
+                order.deliveryAddress?.toLowerCase().includes('in-store') ||
+                order.customerName
+              );
 
               return (
                 <View key={`${orderIdStr}-${orderIdx}`} style={styles.orderCard}>
                   {/* Order Top Bar */}
                   <View style={styles.orderTopBar}>
                     <View style={{ gap: 4 }}>
-                      <View style={styles.orderIdBadge}>
-                        <Text style={styles.orderIdBadgeText}>
-                          ORDER #{displayId}
-                        </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <View style={styles.orderIdBadge}>
+                          <Text style={styles.orderIdBadgeText}>
+                            ORDER #{displayId}
+                          </Text>
+                        </View>
+                        <View style={styles.branchHeadBadge}>
+                          <Store size={10} color="#B0FF49" strokeWidth={2.5} />
+                          <Text style={styles.branchHeadBadgeText}>WOW LAUNDRY</Text>
+                        </View>
+                        {isBranchOrder ? (
+                          <View style={styles.walkInOrderBadge}>
+                            <Text style={styles.walkInOrderBadgeText}>ON-BRANCH</Text>
+                          </View>
+                        ) : null}
                       </View>
                       <Text style={styles.orderDateText}>
                         {formattedDate} at {formattedTime}
@@ -409,6 +429,61 @@ export const CustomerOrdersScreen = () => {
                         </View>
                       );
                     })()}
+
+                    {/* On-Branch Walk-in Customer Contact Box */}
+                    {(order.customerName || order.customerPhone || isBranchOrder) ? (
+                      <View style={styles.walkInCustomerBox}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <User size={13} color={COLORS.black} strokeWidth={2.5} />
+                            <Text style={styles.walkInBoxTitle}>
+                              {isBranchOrder ? 'ON-BRANCH WALK-IN CUSTOMER' : 'CUSTOMER DETAILS'}
+                            </Text>
+                          </View>
+                          <Text style={styles.walkInBranchHeadText}>WOW LAUNDRY</Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <View style={{ flex: 1, minWidth: 140 }}>
+                            <Text style={styles.walkInCustomerName}>
+                              {order.customerName || 'Walk-in Customer'}
+                            </Text>
+                            {order.customerPhone ? (
+                              <Text style={styles.walkInCustomerPhone}>
+                                +91 {order.customerPhone}
+                              </Text>
+                            ) : null}
+                          </View>
+
+                          {order.customerPhone ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <TouchableOpacity
+                                style={styles.customerActionBtn}
+                                activeOpacity={0.8}
+                                onPress={() => Linking.openURL(`tel:${order.customerPhone}`)}
+                              >
+                                <Phone size={11} color={COLORS.black} strokeWidth={2.5} />
+                                <Text style={styles.customerActionBtnText}>CALL</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.customerActionBtn, { backgroundColor: '#DCFCE7', borderColor: '#16A34A' }]}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                  const clean = String(order.customerPhone).replace(/[^0-9]/g, '');
+                                  const intl = clean.length === 10 ? '91' + clean : clean;
+                                  const msg = encodeURIComponent(`Hi ${order.customerName || ''}, regarding your WOW Laundry Order #${displayId}`);
+                                  Linking.openURL(`https://wa.me/${intl}?text=${msg}`);
+                                }}
+                              >
+                                <MessageCircle size={11} color="#166534" strokeWidth={2.5} />
+                                <Text style={[styles.customerActionBtnText, { color: '#166534' }]}>WHATSAPP</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    ) : null}
 
                     {order.pickupTime ? (
                       <View style={styles.slotBadge}>
@@ -1065,5 +1140,99 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontFamily: 'Outfit_800ExtraBold',
     color: COLORS.white,
+  },
+  branchHeadBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.black,
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    ...NEO_SHADOW.box2,
+  },
+  branchHeadBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#B0FF49',
+    letterSpacing: 0.5,
+  },
+  walkInOrderBadge: {
+    backgroundColor: '#FEF08A',
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  walkInOrderBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#854D0E',
+    letterSpacing: 0.5,
+  },
+  walkInCustomerBox: {
+    backgroundColor: '#FAF7F2',
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.md,
+    padding: 10,
+    ...NEO_SHADOW.box2,
+  },
+  walkInBoxTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#475569',
+    letterSpacing: 0.5,
+  },
+  walkInBranchHeadText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: COLORS.black,
+    backgroundColor: '#B0FF49',
+    borderWidth: 1,
+    borderColor: COLORS.black,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  walkInCustomerName: {
+    fontSize: 13,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: COLORS.black,
+    textTransform: 'uppercase',
+  },
+  walkInCustomerPhone: {
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#334155',
+    marginTop: 2,
+  },
+  customerActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    ...NEO_SHADOW.box2,
+  },
+  customerActionBtnText: {
+    fontSize: 10,
+    fontWeight: '900',
+    fontFamily: 'Outfit_800ExtraBold',
+    color: COLORS.black,
+    letterSpacing: 0.3,
   },
 });

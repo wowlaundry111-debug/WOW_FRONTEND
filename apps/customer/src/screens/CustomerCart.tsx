@@ -256,11 +256,13 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   const isStaffOrBranchAdmin =
     currentUser?.email?.toLowerCase().trim() === 'wowlaundry111@gmail.com' ||
     currentUser?.role === 'SuperAdmin' ||
-    currentUser?.role === 'ShopAdmin';
+    currentUser?.role === 'ShopAdmin' ||
+    currentUser?.role === 'Operator';
 
   const [walkInName, setWalkInName] = useState('');
   const [walkInPhone, setWalkInPhone] = useState('');
   const [walkInMode, setWalkInMode] = useState<'BRANCH_PICKUP' | 'HOME_DELIVERY'>('BRANCH_PICKUP');
+  const [weightInputs, setWeightInputs] = useState<Record<string, string>>({});
 
   const calculateItemPrice = (c: any) => {
     if (isKgItem(c)) {
@@ -578,7 +580,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
         name: walkInName.trim(),
         phone: walkInPhone.replace(/\D/g, ''),
         address: finalAddress,
-        isWalkIn: walkInMode === 'BRANCH_PICKUP',
+        isWalkIn: true,
       } : undefined
     );
     setLoading(false);
@@ -1099,9 +1101,13 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                                     keyboardType="decimal-pad"
                                     placeholder="0.00"
                                     placeholderTextColor="#9CA3AF"
-                                    value={item.kgWeight ? String(item.kgWeight) : ''}
+                                    value={weightInputs[item.itemId] !== undefined ? weightInputs[item.itemId] : (item.kgWeight ? String(item.kgWeight) : '')}
                                     onChangeText={(val) => {
-                                      const parsed = parseFloat(val);
+                                      const clean = val.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                                      const parts = clean.split('.');
+                                      const formatted = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean;
+                                      setWeightInputs(prev => ({ ...prev, [item.itemId]: formatted }));
+                                      const parsed = parseFloat(formatted);
                                       setCartItemWeight(item.itemId, isNaN(parsed) ? 0 : parsed);
                                     }}
                                     style={{ fontSize: 11, fontWeight: '900', color: COLORS.black, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.black, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, minWidth: 44, textAlign: 'center' }}
@@ -1160,7 +1166,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
                         <Text style={[styles.cartItemTotal, isKg && { fontSize: 13, color: (item.kgWeight && Number(item.kgWeight) > 0) ? COLORS.black : '#0284C7' }]}>
                           {isKg
                             ? (item.kgWeight && Number(item.kgWeight) > 0
-                                ? `₹${Math.round(Number(item.kgWeight) * (Number(item.pricePerKg) || Number(item.price) || 0) * 100) / 100}`
+                                ? `₹${Math.round(Number(item.kgWeight) * (Number(item.pricePerKg) || (item as any).baseUnitPrice || Number(item.price) || 0) * 100) / 100}`
                                 : (isStaffOrBranchAdmin ? 'Add Wt' : 'Pending'))
                             : `₹${(item.price || 0) * item.quantity}`}
                         </Text>
