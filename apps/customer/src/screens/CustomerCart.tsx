@@ -267,7 +267,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
   const calculateItemPrice = (c: any) => {
     if (isKgItem(c)) {
       if (c.kgWeight && Number(c.kgWeight) > 0) {
-        const rate = Number(c.pricePerKg) || Number(c.price) || 0;
+        const rate = Number(c.pricePerKg) || Number(c.baseUnitPrice) || Number(c.price) || 0;
         return Math.round(Number(c.kgWeight) * rate * 100) / 100;
       }
       return 0;
