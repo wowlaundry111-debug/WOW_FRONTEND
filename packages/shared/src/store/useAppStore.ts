@@ -577,12 +577,12 @@ export const useAppStore = create<AppState>()(
       },
 
       // Paginated orders fetch with strict shop partitioning
-      fetchOrders: async (page = 1) => {
+      fetchOrders: async (page = 1, limit = 200) => {
         if (!get().currentUser) return;
         set({ isOrdersLoading: true, error: null });
         try {
           const shopId = get().currentTenantId || get().currentUser?.shopId;
-          const url = shopId ? `/orders?page=${page}&limit=50&shopId=${shopId}` : `/orders?page=${page}&limit=50`;
+          const url = shopId ? `/orders?page=${page}&limit=${limit}&shopId=${shopId}` : `/orders?page=${page}&limit=${limit}`;
           const res = await api.get(url);
           const { orders, total } = res.data;
 
