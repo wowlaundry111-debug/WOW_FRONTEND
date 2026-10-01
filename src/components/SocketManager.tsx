@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
@@ -48,6 +48,21 @@ const triggerLocalAlert = (title: string, body: string, data?: any) => {
 
 export const SocketManager: React.FC = () => {
   const currentUser = useAppStore((state) => state.currentUser);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active' && currentUser) {
+        connectSocket(currentUser);
+        useAppStore.getState().fetchOrders(1);
+        useAppStore.getState().initializeAppData(true);
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {

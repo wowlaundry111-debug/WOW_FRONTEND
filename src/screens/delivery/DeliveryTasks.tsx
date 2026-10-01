@@ -628,10 +628,11 @@ export const DeliveryTasksScreen = () => {
 
 
   React.useEffect(() => {
-    if (shops.length === 0) {
+    if (currentUser) {
+      fetchOrders(1);
       initializeAppData();
     }
-  }, [shops.length, initializeAppData]);
+  }, [currentUser, fetchOrders, initializeAppData]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);

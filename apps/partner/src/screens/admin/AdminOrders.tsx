@@ -460,6 +460,12 @@ export const AdminOrdersScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
 
+  React.useEffect(() => {
+    if (currentUser) {
+      fetchOrders(1);
+    }
+  }, [currentUser, fetchOrders]);
+
   const handlePaymentConfirm = async (mode: 'UPI' | 'COD') => {
     if (!paymentModalOrder) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);

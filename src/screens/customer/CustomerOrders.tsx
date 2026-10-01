@@ -160,6 +160,12 @@ export const CustomerOrdersScreen = () => {
   const [now, setNow] = React.useState(Date.now());
 
   React.useEffect(() => {
+    if (currentUser) {
+      fetchOrders(1);
+    }
+  }, [currentUser, fetchOrders]);
+
+  React.useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(timer);
   }, []);

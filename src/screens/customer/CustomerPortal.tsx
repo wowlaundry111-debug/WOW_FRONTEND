@@ -13,9 +13,17 @@ import { useAppStore } from '../../store/useAppStore';
 type Tab = 'HOME' | 'SHOP' | 'CART' | 'ORDERS' | 'PROFILE';
 
 export const CustomerPortal = () => {
-  const { currentTenantId, setCurrentTenantId } = useAppStore();
+  const { currentTenantId, setCurrentTenantId, fetchOrders, initializeAppData } = useAppStore();
   const [activeTab, setActiveTab] = useState<Tab>('HOME');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (activeTab === 'ORDERS') {
+      fetchOrders(1);
+    } else if (activeTab === 'HOME') {
+      initializeAppData();
+    }
+  }, [activeTab, fetchOrders, initializeAppData]);
 
   const navigateToShop = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
