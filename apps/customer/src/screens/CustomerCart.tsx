@@ -571,6 +571,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     const mappedPrefs = activeWashPreferences.map((wp) => ({ name: wp.name, price: wp.price }));
+    const isSpecialBranchUser = currentUser?.email?.toLowerCase().trim() === 'wowlaundry111@gmail.com';
     const pickupSlot = `${selectedDay} | ${selectedSlot}`;
     const result = await placeOrder(
       finalAddress,
@@ -580,7 +581,7 @@ export const CustomerCartScreen: React.FC<CustomerCartProps> = ({ onBack, onChec
         name: walkInName.trim(),
         phone: walkInPhone.replace(/\D/g, ''),
         address: finalAddress,
-        isWalkIn: true,
+        isWalkIn: isSpecialBranchUser,
       } : undefined
     );
     setLoading(false);

@@ -33,8 +33,10 @@ import {
   Banknote,
   Smartphone,
   AlertTriangle,
-  Wifi,
   Store,
+  Clock,
+  Calendar,
+  Wifi,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
@@ -67,7 +69,7 @@ const FILTERS: {
     label: 'Out for Delivery',
     statuses: ['OUT_FOR_DELIVERY'],
   },
-  { key: 'history', label: 'History', statuses: ['DELIVERED'] },
+  { key: 'history', label: 'History', statuses: ['DELIVERED', 'CANCELLED'] },
 ];
 
 const isKgCheck = (it: any) =>
@@ -530,32 +532,6 @@ export const AdminOrdersScreen: React.FC = () => {
 
   const currentFilterConfig = FILTERS.find((f) => f.key === activeFilter) || FILTERS[0];
   const filteredOrders = tenantOrders.filter((o) => {
-    const isBranch = Boolean(
-      o.isWalkIn ||
-      o.adminNotes?.toLowerCase().includes('branch') ||
-      o.adminNotes?.toLowerCase().includes('walk-in') ||
-      o.customerAddress?.toLowerCase().includes('branch') ||
-      o.customerAddress?.toLowerCase().includes('walk-in') ||
-      o.customerAddress?.toLowerCase().includes('in-store') ||
-      o.customerAddress?.toLowerCase().includes('counter') ||
-      o.customerAddress?.toLowerCase().includes('drop-off') ||
-      o.deliveryAddress?.toLowerCase().includes('branch') ||
-      o.deliveryAddress?.toLowerCase().includes('walk-in') ||
-      o.deliveryAddress?.toLowerCase().includes('in-store') ||
-      o.deliveryAddress?.toLowerCase().includes('counter') ||
-      o.deliveryAddress?.toLowerCase().includes('drop-off')
-    );
-
-    // On-branch / walk-in orders NEVER belong in 'new' (New Orders) queue
-    if (activeFilter === 'new' && isBranch) {
-      return false;
-    }
-
-    // On-branch orders immediately belong in 'washing' (In Wash Cycle)
-    if (activeFilter === 'washing' && isBranch && ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED', 'PICKED_UP', 'WASHING', 'IRONING'].includes(o.status)) {
-      return true;
-    }
-
     return currentFilterConfig.statuses.includes(o.status);
   });
 
@@ -820,6 +796,16 @@ export const AdminOrdersScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Order Placement Date & Time */}
+              {order.createdAt ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, marginBottom: 4 }}>
+                  <Clock size={11} color="#4B5563" strokeWidth={2.5} />
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#4B5563' }}>
+                    PLACED: {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()} · {new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  </Text>
+                </View>
+              ) : null}
 
               {/* Customer Row */}
               <View style={styles.customerRow}>
@@ -1168,6 +1154,14 @@ export const AdminOrdersScreen: React.FC = () => {
                 <Text style={styles.modalHeading}>
                   #{selectedOrder?._id.slice(-6).toUpperCase()}
                 </Text>
+                {selectedOrder?.createdAt && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                    <Calendar size={12} color="#4B5563" />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#4B5563' }}>
+                      Placed: {new Date(selectedOrder.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(selectedOrder.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TouchableOpacity

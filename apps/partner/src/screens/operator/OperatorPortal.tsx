@@ -276,6 +276,16 @@ export const OperatorPortal: React.FC = () => {
           </View>
         </View>
 
+        {/* Order Placement Date & Time */}
+        {item.createdAt ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingTop: 6 }}>
+            <Clock size={11} color="#4B5563" strokeWidth={2.5} />
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#4B5563' }}>
+              PLACED: {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()} · {new Date(item.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Customer & Info */}
         <View style={styles.cardBody}>
           <Text style={styles.customerName}>{item.customerName || 'Customer'}</Text>

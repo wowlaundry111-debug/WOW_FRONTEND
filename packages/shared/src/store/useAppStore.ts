@@ -112,6 +112,24 @@ interface AppState {
   storageStatus: { totalOrders: number; isNearLimit: boolean } | null;
   checkStorageStatus: () => Promise<void>;
   archiveDeliveredOrders: () => Promise<{ success: boolean; archivedCount?: number; message?: string }>;
+
+  // Analytics (server-side aggregation — covers ALL orders, not just first 200)
+  analyticsData: {
+    kpis: {
+      totalRevenue: number;
+      totalOrders: number;
+      avgOrderValue: number;
+      cashRevenue: number;
+      onlineRevenue: number;
+      deliveredCount: number;
+      pendingCount: number;
+      cancelledCount: number;
+    } | null;
+    trendBuckets: Array<{ _id: string; revenue: number; orders: number }>;
+    itemsPopularity: Array<{ _id: string; count: number; revenue: number }>;
+  } | null;
+  isAnalyticsLoading: boolean;
+  fetchAnalytics: (range?: string, startDate?: string, endDate?: string) => Promise<void>;
 }
 
 // // Catalog fetch deduplication guard
@@ -142,6 +160,8 @@ export const useAppStore = create<AppState>()(
       orderPage: 1,
       error: null,
       storageStatus: null,
+      analyticsData: null,
+      isAnalyticsLoading: false,
 
       // Environment Switch Actions
       setCurrentRole: (role) => {
@@ -582,7 +602,8 @@ export const useAppStore = create<AppState>()(
         set({ isOrdersLoading: true, error: null });
         try {
           const shopId = get().currentTenantId || get().currentUser?.shopId;
-          const url = shopId ? `/orders?page=${page}&limit=${limit}&shopId=${shopId}` : `/orders?page=${page}&limit=${limit}`;
+          const validShopId = (shopId && shopId !== 'all' && shopId !== 'undefined') ? shopId : '';
+          const url = validShopId ? `/orders?page=${page}&limit=${limit}&shopId=${validShopId}` : `/orders?page=${page}&limit=${limit}`;
           const res = await api.get(url);
           const { orders, total } = res.data;
 
@@ -649,6 +670,47 @@ export const useAppStore = create<AppState>()(
         } catch (err: any) {
           set({ isLoading: false });
           return { success: false, message: err.message || 'Failed to archive' };
+        }
+      },
+
+      // Fetches server-side aggregated analytics — covers ALL orders, not just the 200 in-memory
+      fetchAnalytics: async (range?: string, startDate?: string, endDate?: string) => {
+        if (!get().currentUser) return;
+        const role = get().currentUser?.role;
+        if (!['SuperAdmin', 'ShopAdmin'].includes(role || '')) return;
+        set({ isAnalyticsLoading: true });
+        try {
+          const shopId = get().currentTenantId || get().currentUser?.shopId;
+          const params = new URLSearchParams();
+          if (range && range !== 'all') params.set('range', range);
+          if (startDate) params.set('startDate', startDate);
+          if (endDate) params.set('endDate', endDate);
+          if (shopId && shopId !== 'all' && shopId !== 'undefined') params.set('shopId', shopId);
+          const url = `/orders/analytics${params.toString() ? `?${params.toString()}` : ''}`;
+          const res = await api.get(url);
+          const rawResult = res.data;
+          const kpisArray = rawResult?.kpis || [];
+          const kpisRaw = kpisArray.length > 0 ? kpisArray[0] : null;
+          set({
+            analyticsData: {
+              kpis: kpisRaw ? {
+                totalRevenue: kpisRaw.totalRevenue || 0,
+                totalOrders: kpisRaw.totalOrders || 0,
+                avgOrderValue: kpisRaw.avgOrderValue || 0,
+                cashRevenue: kpisRaw.cashRevenue || 0,
+                onlineRevenue: kpisRaw.onlineRevenue || 0,
+                deliveredCount: kpisRaw.deliveredCount || 0,
+                pendingCount: kpisRaw.pendingCount || 0,
+                cancelledCount: kpisRaw.cancelledCount || 0,
+              } : null,
+              trendBuckets: rawResult?.trendBuckets || [],
+              itemsPopularity: rawResult?.itemsPopularity || [],
+            },
+            isAnalyticsLoading: false,
+          });
+        } catch (err: any) {
+          console.error('Failed to fetch analytics', err);
+          set({ isAnalyticsLoading: false });
         }
       },
 
@@ -903,17 +965,10 @@ export const useAppStore = create<AppState>()(
         try {
           const shop = get().shops.find(s => s._id === currentTenantId);
           const taxPercent = shop?.taxPercent || 0;
+          const isSpecialBranchUser = currentUser?.email?.toLowerCase().trim() === 'wowlaundry111@gmail.com';
           const isWalkIn = Boolean(
-            walkInCustomer?.isWalkIn ||
-            Boolean(walkInCustomer && (walkInCustomer.name || walkInCustomer.phone)) ||
-            (currentUser?.role === 'SuperAdmin' || currentUser?.role === 'ShopAdmin' || currentUser?.role === 'Operator' || currentUser?.email?.toLowerCase().trim() === 'wowlaundry111@gmail.com') ||
-            (typeof effectiveAddress === 'string' && (
-              effectiveAddress.toLowerCase().includes('walk-in') ||
-              effectiveAddress.toLowerCase().includes('branch') ||
-              effectiveAddress.toLowerCase().includes('in-store') ||
-              effectiveAddress.toLowerCase().includes('counter') ||
-              effectiveAddress.toLowerCase().includes('drop-off')
-            ))
+            isSpecialBranchUser ||
+            walkInCustomer?.isWalkIn
           );
           const deliveryFeeAmt = isWalkIn ? 0 : ((shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0);
           const tax = (perItemSubtotal * taxPercent) / 100;
@@ -951,7 +1006,7 @@ export const useAppStore = create<AppState>()(
             isWalkIn: rawOrder.isWalkIn ?? isWalkIn,
             createdAt: rawOrder.createdAt || new Date().toISOString(),
             items: Array.isArray(rawOrder.items) ? rawOrder.items : [],
-            status: rawOrder.status || (isWalkIn ? 'PICKED_UP' : 'PLACED'),
+            status: rawOrder.status || (isSpecialBranchUser ? 'PICKED_UP' : 'PLACED'),
           };
 
           set(state => ({

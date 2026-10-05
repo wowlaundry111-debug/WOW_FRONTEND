@@ -949,6 +949,16 @@ export const DeliveryTasksScreen = () => {
                 </View>
               </View>
 
+              {/* Order Placement Date & Time */}
+              {order.createdAt ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, marginBottom: 2 }}>
+                  <Clock size={11} color="#4B5563" strokeWidth={2.5} />
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#4B5563' }}>
+                    PLACED: {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()} · {new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  </Text>
+                </View>
+              ) : null}
+
               <View style={styles.customerHeaderRow}>
                 <Text style={styles.customerName}>{order.customerName || 'Customer'}</Text>
                 {resolvedPhone ? (

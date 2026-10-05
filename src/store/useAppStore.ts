@@ -903,17 +903,10 @@ export const useAppStore = create<AppState>()(
         try {
           const shop = get().shops.find(s => s._id === currentTenantId);
           const taxPercent = shop?.taxPercent || 0;
+          const isSpecialBranchUser = currentUser?.email?.toLowerCase().trim() === 'wowlaundry111@gmail.com';
           const isWalkIn = Boolean(
-            walkInCustomer?.isWalkIn ||
-            Boolean(walkInCustomer && (walkInCustomer.name || walkInCustomer.phone)) ||
-            (currentUser?.role === 'SuperAdmin' || currentUser?.role === 'ShopAdmin' || currentUser?.role === 'Operator' || currentUser?.email?.toLowerCase().trim() === 'wowlaundry111@gmail.com') ||
-            (typeof effectiveAddress === 'string' && (
-              effectiveAddress.toLowerCase().includes('walk-in') ||
-              effectiveAddress.toLowerCase().includes('branch') ||
-              effectiveAddress.toLowerCase().includes('in-store') ||
-              effectiveAddress.toLowerCase().includes('counter') ||
-              effectiveAddress.toLowerCase().includes('drop-off')
-            ))
+            isSpecialBranchUser ||
+            walkInCustomer?.isWalkIn
           );
           const deliveryFeeAmt = isWalkIn ? 0 : ((shop?.deliveryFee !== undefined && shop?.deliveryFee !== null) ? Number(shop.deliveryFee) : 0);
           const tax = (perItemSubtotal * taxPercent) / 100;
@@ -951,7 +944,7 @@ export const useAppStore = create<AppState>()(
             isWalkIn: rawOrder.isWalkIn ?? isWalkIn,
             createdAt: rawOrder.createdAt || new Date().toISOString(),
             items: Array.isArray(rawOrder.items) ? rawOrder.items : [],
-            status: rawOrder.status || (isWalkIn ? 'PICKED_UP' : 'PLACED'),
+            status: rawOrder.status || (isSpecialBranchUser ? 'PICKED_UP' : 'PLACED'),
           };
 
           set(state => ({

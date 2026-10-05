@@ -215,6 +215,14 @@ export const DeliveryHistoryScreen = () => {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.customerName}>{customerName}</Text>
                     <Text style={styles.orderIdText}>#{order._id.slice(-6).toUpperCase()}</Text>
+                    {order.createdAt ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <Clock size={11} color="#6B7280" />
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#6B7280' }}>
+                          PLACED: {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()} · {new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 4 }}>
                     <View style={styles.deliveredBadge}>

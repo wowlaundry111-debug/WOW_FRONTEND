@@ -32,149 +32,124 @@ export const AdminDashboardScreen: React.FC = () => {
     fetchOrders,
     fetchUsers,
     fetchCatalog,
+    fetchAnalytics,
+    analyticsData,
+    isAnalyticsLoading,
   } = useAppStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState<'today' | 'yesterday' | '7days' | '30days' | 'this_month' | 'all'>('all');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
+  // Fetch analytics from server (covers ALL orders, not just in-memory 200)
+  React.useEffect(() => {
+    fetchAnalytics(timeRange !== 'all' ? timeRange : undefined);
+  }, [timeRange, currentTenantId]);
+
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchOrders(1), fetchUsers(), fetchCatalog()]);
+    await Promise.all([
+      fetchOrders(1),
+      fetchUsers(),
+      fetchCatalog(),
+      fetchAnalytics(timeRange !== 'all' ? timeRange : undefined),
+    ]);
     setRefreshing(false);
-  }, [fetchOrders, fetchUsers, fetchCatalog]);
+  }, [fetchOrders, fetchUsers, fetchCatalog, fetchAnalytics, timeRange]);
 
   const activeShopId = currentTenantId || currentUser?.shopId || '';
   const currentShop = shops.find((s) => s._id === activeShopId);
   
+  // Tenant-scoped in-memory orders (used only for real-time active queue count)
   const tenantOrders = activeShopId
     ? orders.filter((o) => o.shopId === activeShopId)
     : orders;
 
-  // ─── Filtered Orders Calculation ────────────────────────────────────────────
-  const filteredOrders = useMemo(() => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    return tenantOrders.filter((o) => {
-      const orderDate = new Date(o.createdAt || Date.now());
-
-      if (timeRange === 'today') {
-        return orderDate >= todayStart;
-      }
-      if (timeRange === 'yesterday') {
-        const yestStart = new Date(todayStart);
-        yestStart.setDate(yestStart.getDate() - 1);
-        const yestEnd = new Date(todayStart);
-        return orderDate >= yestStart && orderDate < yestEnd;
-      }
-      if (timeRange === '7days') {
-        const d7 = new Date(now);
-        d7.setDate(d7.getDate() - 7);
-        return orderDate >= d7;
-      }
-      if (timeRange === '30days') {
-        const d30 = new Date(now);
-        d30.setDate(d30.getDate() - 30);
-        return orderDate >= d30;
-      }
-      if (timeRange === 'this_month') {
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        return orderDate >= monthStart;
-      }
-      return true; // 'all'
-    });
-  }, [tenantOrders, timeRange]);
-
-  // ─── Key Performance Indicators (KPIs) ──────────────────────────────────────
-  const totalRevenue = useMemo(() => {
-    return filteredOrders
+  // ─── Server-side KPIs with immediate in-memory fallback ────────────────────
+  const serverKpis = analyticsData?.kpis;
+  const inMemoryRevenue = useMemo(() => {
+    return tenantOrders
       .filter((o) => o.status !== 'CANCELLED')
       .reduce((acc, o) => acc + (o.totalAmount || 0), 0);
-  }, [filteredOrders]);
+  }, [tenantOrders]);
+  const inMemoryDelivered = useMemo(() => {
+    return tenantOrders.filter((o) => o.status === 'DELIVERED').length;
+  }, [tenantOrders]);
+  const inMemoryCancelled = useMemo(() => {
+    return tenantOrders.filter((o) => o.status === 'CANCELLED').length;
+  }, [tenantOrders]);
 
-  const totalOrdersCount = filteredOrders.length;
+  const totalRevenue = serverKpis?.totalRevenue ?? inMemoryRevenue;
+  const totalOrdersCount = serverKpis?.totalOrders ?? tenantOrders.length;
+  const deliveredOrdersCount = serverKpis?.deliveredCount ?? inMemoryDelivered;
+  const cancelledOrdersCount = serverKpis?.cancelledCount ?? inMemoryCancelled;
+  const avgOrderValue = serverKpis?.avgOrderValue ?? (totalOrdersCount > 0 ? totalRevenue / totalOrdersCount : 0);
+  const cashRevenue = serverKpis?.cashRevenue ?? tenantOrders.filter(o => o.status !== 'CANCELLED' && o.paymentMode === 'COD').reduce((s, o) => s + (o.totalAmount || 0), 0);
+  const onlineRevenue = serverKpis?.onlineRevenue ?? tenantOrders.filter(o => o.status !== 'CANCELLED' && (o.paymentMode === 'UPI' || o.paymentMode === 'CARD' || (o.paymentMode as any) === 'ONLINE')).reduce((s, o) => s + (o.totalAmount || 0), 0);
 
-  const deliveredOrdersCount = useMemo(() => {
-    return filteredOrders.filter((o) => o.status === 'DELIVERED').length;
-  }, [filteredOrders]);
+  const cashOrdersCount = useMemo(() => {
+    return tenantOrders.filter((o) => o.paymentMode === 'COD').length;
+  }, [tenantOrders]);
 
+  const onlineOrdersCount = useMemo(() => {
+    return tenantOrders.filter((o) => ['UPI', 'CARD', 'ONLINE'].includes(o.paymentMode as any)).length;
+  }, [tenantOrders]);
+
+  const topCustomers = useMemo(() => {
+    const stats: Record<string, { id: string; name: string; orders: number; amount: number }> = {};
+    tenantOrders.forEach((o) => {
+      if (o.status === 'CANCELLED') return;
+      const customer = users.find((u) => u._id === o.customerId);
+      const name = customer?.name || o.customerName || 'Customer';
+      const id = o.customerId || name;
+      if (!stats[id]) stats[id] = { id, name, orders: 0, amount: 0 };
+      stats[id].orders += 1;
+      stats[id].amount += o.totalAmount || 0;
+    });
+    return Object.values(stats)
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+  }, [tenantOrders, users]);
+
+  // Active queue: use in-memory orders for real-time count (analytics has 60s cache delay)
   const pendingOrdersCount = useMemo(() => {
-    return filteredOrders.filter((o) =>
-      ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED', 'WASHING', 'IRONING', 'OUT_FOR_DELIVERY'].includes(o.status)
+    return tenantOrders.filter((o) =>
+      ['PLACED', 'ACCEPTED', 'PICKUP_ASSIGNED', 'PICKED_UP', 'WASHING', 'IRONING', 'OUT_FOR_DELIVERY'].includes(o.status)
     ).length;
-  }, [filteredOrders]);
-
-  const cancelledOrdersCount = useMemo(() => {
-    return filteredOrders.filter((o) => o.status === 'CANCELLED').length;
-  }, [filteredOrders]);
-
-  const nonCancelledOrdersCount = totalOrdersCount - cancelledOrdersCount;
-  const avgOrderValue = nonCancelledOrdersCount > 0 ? totalRevenue / nonCancelledOrdersCount : 0;
+  }, [tenantOrders]);
 
   const deliveryBoys = users.filter(
     (u) => u.role === 'Delivery' && (!activeShopId || !u.shopId || u.shopId === activeShopId)
   );
 
-  // ─── Payment Mode Breakdown ────────────────────────────────────────────────
-  const cashRevenue = useMemo(() => {
-    return filteredOrders
-      .filter((o) => o.status !== 'CANCELLED' && o.paymentMode === 'COD')
-      .reduce((acc, o) => acc + (o.totalAmount || 0), 0);
-  }, [filteredOrders]);
-
-  const onlineRevenue = useMemo(() => {
-    return filteredOrders
-      .filter((o) => o.status !== 'CANCELLED' && (o.paymentMode === 'UPI' || o.paymentMode === 'CARD' || (o.paymentMode as any) === 'ONLINE'))
-      .reduce((acc, o) => acc + (o.totalAmount || 0), 0);
-  }, [filteredOrders]);
-
-  const cashOrdersCount = filteredOrders.filter((o) => o.paymentMode === 'COD').length;
-  const onlineOrdersCount = filteredOrders.filter((o) => ['UPI', 'CARD', 'ONLINE'].includes(o.paymentMode as any)).length;
-
-  // ─── Revenue & Order Trend Buckets (Graph Data) ────────────────────────────
+  // ─── Revenue & Order Trend Buckets (from server analytics response) ──────────
   const trendGraphData = useMemo(() => {
-    if (filteredOrders.length === 0) return [];
-
-    const isHourly = timeRange === 'today' || timeRange === 'yesterday';
-
-    if (isHourly) {
-      const hoursMap: Record<string, { label: string; revenue: number; orders: number }> = {};
-      for (let h = 0; h < 24; h += 2) {
-        const label = `${String(h).padStart(2, '0')}:00`;
-        hoursMap[label] = { label, revenue: 0, orders: 0 };
-      }
-      filteredOrders.forEach((o) => {
-        const d = new Date(o.createdAt || Date.now());
-        const h = Math.floor(d.getHours() / 2) * 2;
-        const label = `${String(h).padStart(2, '0')}:00`;
-        if (hoursMap[label]) {
-          if (o.status !== 'CANCELLED') {
-            hoursMap[label].revenue += o.totalAmount || 0;
-          }
-          hoursMap[label].orders += 1;
-        }
-      });
-      return Object.values(hoursMap);
-    } else {
-      const daysMap: Record<string, { label: string; dateObj: Date; revenue: number; orders: number }> = {};
-      filteredOrders.forEach((o) => {
-        const d = new Date(o.createdAt || Date.now());
-        const key = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }).toUpperCase();
-        if (!daysMap[key]) {
-          daysMap[key] = { label: key, dateObj: d, revenue: 0, orders: 0 };
-        }
-        if (o.status !== 'CANCELLED') {
-          daysMap[key].revenue += o.totalAmount || 0;
-        }
-        daysMap[key].orders += 1;
-      });
-
-      return Object.values(daysMap)
-        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
-        .slice(-10); // Clean 10-day timeline window for mobile screens
+    const serverBuckets = analyticsData?.trendBuckets || [];
+    if (serverBuckets.length > 0) {
+      // Use server-computed buckets
+      return serverBuckets.map((b) => ({
+        label: new Date(b._id).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }).toUpperCase(),
+        revenue: b.revenue,
+        orders: b.orders,
+        dateStr: b._id,
+      }))
+        .sort((a, b) => a.dateStr.localeCompare(b.dateStr))
+        .slice(-10);
     }
-  }, [filteredOrders, timeRange]);
+    // Fallback to local computation if analytics not loaded yet
+    if (tenantOrders.length === 0) return [];
+    const daysMap: Record<string, { label: string; dateObj: Date; revenue: number; orders: number }> = {};
+    tenantOrders.forEach((o) => {
+      const d = new Date((o as any).createdAt || Date.now());
+      const key = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }).toUpperCase();
+      if (!daysMap[key]) daysMap[key] = { label: key, dateObj: d, revenue: 0, orders: 0 };
+      if (o.status !== 'CANCELLED') daysMap[key].revenue += o.totalAmount || 0;
+      daysMap[key].orders += 1;
+    });
+    return Object.values(daysMap)
+      .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
+      .slice(-10);
+  }, [analyticsData, tenantOrders]);
 
   const maxBucketRevenue = useMemo(() => {
     return Math.max(...trendGraphData.map((b) => b.revenue), 1);
@@ -190,22 +165,8 @@ export const AdminDashboardScreen: React.FC = () => {
     ];
   }, [maxBucketRevenue]);
 
-  // Top Customers Leaderboard
-  const topCustomers = useMemo(() => {
-    const stats: Record<string, { id: string; name: string; orders: number; amount: number }> = {};
-    filteredOrders.forEach((o) => {
-      if (o.status === 'CANCELLED') return;
-      const customer = users.find((u) => u._id === o.customerId);
-      const name = customer?.name || o.customerName || 'Customer';
-      const id = o.customerId || name;
-      if (!stats[id]) stats[id] = { id, name, orders: 0, amount: 0 };
-      stats[id].orders += 1;
-      stats[id].amount += o.totalAmount || 0;
-    });
-    return Object.values(stats)
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5);
-  }, [filteredOrders, users]);
+  // Top Items from server analytics
+  const topItems = analyticsData?.itemsPopularity || [];
 
   const formatCompactNumber = (num: number) => {
     if (num >= 1000) return `₹${(num / 1000).toFixed(1)}k`;
